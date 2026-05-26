@@ -63,13 +63,13 @@ button.header-btn { background: var(--bg3); color: var(--text); border: 1px soli
 .sync-btn { width: 100%; background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(74,158,255,0.4); padding: 12px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .sync-btn:active { opacity: 0.8; }
 
-/* ── Tabs & Main ── */
+/* ── Tabs ── */
 .tabs-wrap { display: flex; gap: 6px; padding: 10px 20px; overflow-x: auto; }
 .tab { padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text2); background: transparent; border: 1px solid var(--border); border-radius: 100px; cursor: pointer; white-space: nowrap; }
 .tab.active { color: var(--bg); background: var(--text); border-color: var(--text); }
 main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 
-/* ── カード・タイムライン・各種表示（既存デザインを完全維持） ── */
+/* ── カード・タイムライン・各種表示 ── */
 .ev-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
 .ev-card.has-alert { border-color: rgba(74,158,255,0.2); }
 .ev-header { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; }
@@ -94,12 +94,10 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 .role-tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 700; }
 .role-fo  { background: rgba(74,158,255,.15);  color: var(--blue); }
 .role-dh  { background: rgba(138,155,181,.12); color: var(--text2); }
-.after-stay-tag { font-size: 10px; font-weight: 700; background: rgba(245,166,35,0.15); color: var(--amber); border: 1px solid rgba(245,166,35,0.25); padding: 1px 6px; border-radius: 100px; }
 
 .dep-box { background: var(--green-dim); border: 1px solid rgba(52,199,138,0.2); border-radius: var(--radius-sm); padding: 11px 14px; margin-top: 10px; }
 .dep-box-label { font-size: 10px; color: var(--green); font-weight: 700; margin-bottom: 4px; }
 .dep-flight { font-size: 15px; font-weight: 700; color: var(--text); font-family: 'Courier New', monospace; }
-.dep-sub { font-size: 11px; color: rgba(52,199,138,.7); margin-top: 2px; }
 
 .alert-box { background: rgba(10,14,26,0.6); border: 1px solid rgba(74,158,255,0.2); border-radius: var(--radius-sm); padding: 11px 14px; margin-top: 8px; }
 .alert-box-title { font-size: 10px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
@@ -125,6 +123,7 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 #bulk-bar-btn { padding: 8px 18px; font-size: 13px; font-weight: 700; color: var(--bg); background: linear-gradient(135deg, var(--blue), var(--green)); border: none; border-radius: 100px; cursor: pointer; }
 </style>
 
+<!-- Google API SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
@@ -150,8 +149,9 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
   </div>
 </header>
 
+<!-- 環境設定パネル -->
 <div id="config-panel" class="config-panel">
-  <div class="config-title">Google API 連携設定 (ブラウザのみに安全に保存されます)</div>
+  <div class="config-title">Google API 連携設定</div>
   <div class="config-field">
     <label>Google API Key</label>
     <input type="password" id="cfg-api-key" placeholder="AIzaSy...">
@@ -161,7 +161,7 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
     <input type="text" id="cfg-client-id" placeholder="xxxx.apps.googleusercontent.com">
   </div>
   <div class="config-field">
-    <label>読み込み元フライトカレンダーID (未入力の場合はメインカレンダー)</label>
+    <label>読み込み元フライトカレンダーID (空欄ならメインカレンダー)</label>
     <input type="text" id="cfg-src-cal-id" placeholder="primary">
   </div>
   <button class="header-btn" style="width:100%; justify-content:center; background:var(--blue); color:#000; margin-top:8px;" onclick="saveConfig()">設定を保存</button>
@@ -184,10 +184,10 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 
 <script>
 /* ══════════════════════════════════════
-   CONFIG — Googleカレンダー登録先
+   カレンダー 登録先ID一覧
 ══════════════════════════════════════ */
-const TARGET_CAL_ID = "89fihd656vdmnlgisqape2l4no@group.calendar.google.com"; // 0予定
-const IDO_CAL_ID   = "ksjofkag773varmi7j1afj23k0@group.calendar.google.com"; // 3 移動
+const TARGET_CAL_ID = "89fihd656vdmnlgisqape2l4no@group.calendar.google.com"; // 0予定（追検）
+const IDO_CAL_ID   = "ksjofkag773varmi7j1afj23k0@group.calendar.google.com"; // 3移動
 
 const TZ = { HND:9,NRT:9,ITM:9,KIX:9,FUK:9,OKA:9,CTS:9,LAX:-7,SFO:-7,SEA:-7,JFK:-4,SIN:8,HKG:8,ICN:9,BKK:7,TSA:8,CAN:8,MNL:8,SGN:7 };
 function tzOff(iata){ return TZ[iata] !== undefined ? TZ[iata] : 9; }
@@ -205,14 +205,14 @@ function saveStore() { localStorage.setItem('tsuiken_api_registered', JSON.strin
 window.addEventListener('load', () => { initGoogleAPI(); });
 
 /* ══════════════════════════════════════
-   Google API 認証・初期化
+   Google API 認証・制御
 ══════════════════════════════════════ */
 function toggleConfig() { document.getElementById('config-panel').classList.toggle('show'); }
 
 function saveConfig() {
   localStorage.setItem('cfg_api_key', document.getElementById('cfg-api-key').value.trim());
-  localStorage.setItem('cfg_client_id', document.getElementById('cfg-client-id').value.trim());
-  localStorage.setItem('cfg_src_cal_id', document.getElementById('cfg-src-cal-id').value.trim() || 'primary');
+  localStorage.setItem('cfg_src_cal_id', document.getElementById('cfg-client-id').value.trim());
+  localStorage.setItem('cfg_src_cal_id_real', document.getElementById('cfg-src-cal-id').value.trim() || 'primary');
   showToast('設定を保存しました');
   toggleConfig();
   initGoogleAPI();
@@ -220,17 +220,19 @@ function saveConfig() {
 
 function initGoogleAPI() {
   const apiKey = localStorage.getItem('cfg_api_key');
-  const clientId = localStorage.getItem('cfg_client_id');
+  const clientId = localStorage.getItem('cfg_src_cal_id'); // 内部キー
   
   document.getElementById('cfg-api-key').value = apiKey || '';
   document.getElementById('cfg-client-id').value = clientId || '';
-  document.getElementById('cfg-src-cal-id').value = localStorage.getItem('cfg_src_cal_id') || 'primary';
+  document.getElementById('cfg-src-cal-id').value = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
 
   if (!apiKey || !clientId) return;
 
   gapi.load('client', async () => {
-    await gapi.client.init({ apiKey: apiKey, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
-    gapiInited = true;
+    try {
+      await gapi.client.init({ apiKey: apiKey, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
+      gapiInited = true;
+    } catch(e){ console.error(e); }
   });
 
   tokenClient = google.accounts.oauth2.initTokenClient({
@@ -243,7 +245,7 @@ function initGoogleAPI() {
 
 function getAccessToken() {
   return new Promise((resolve, reject) => {
-    if (!tokenClient) return reject('APIキー、またはクライアントIDが設定されていません');
+    if (!tokenClient) return reject('API認証の初期設定が足りません');
     tokenClient.callback = (resp) => { if (resp.error) reject(resp); resolve(resp); };
     if (gapi.client.getToken() === null) tokenClient.requestAccessToken({ prompt: 'consent' });
     else tokenClient.requestAccessToken({ prompt: '' });
@@ -251,18 +253,17 @@ function getAccessToken() {
 }
 
 /* ══════════════════════════════════════
-   カレンダーからフライト予定（メモ付）を自動取得
+   カレンダーからメモ付きフライト情報を自動吸い出し
 ══════════════════════════════════════ */
 async function fetchFlightEvents() {
-  if (!gapiInited || !gisInited) { showToast('⚙設定からAPI設定を行ってください', false); toggleConfig(); return; }
+  if (!gapiInited || !gisInited) { showToast('⚙設定を開き、APIキーとクライアントIDを設定してください', false); toggleConfig(); return; }
   
   try {
     await getAccessToken();
-    showToast('カレンダーからフライト情報を読込中...');
+    showToast('Googleカレンダーから情報を同期中...');
     
-    const srcCalId = localStorage.getItem('cfg_src_cal-id') || 'primary';
+    const srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary'; // タイポ修正済
     const now = new Date();
-    // 今日から30日先までの予定を取得対象にする
     const timeMin = now.toISOString();
     const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -278,8 +279,8 @@ async function fetchFlightEvents() {
     EVENTS = [];
 
     items.forEach(item => {
-      // メモ（description）欄に "Check-in" や "Hotel" などのフライトスケジュール固有の文言があるか判定
-      if (item.description && (item.description.includes('Check-in') || item.description.includes('Hotel'))) {
+      // メモ欄（description）にフライト固有のキーワードがあるものを自動識別
+      if (item.description && (item.description.includes('Check-in') || item.description.includes('Hotel') || item.description.includes('DEADHEAD') || item.description.includes('FO'))) {
         EVENTS.push({
           id: item.id,
           summary: item.summary || 'フライトスケジュール',
@@ -290,15 +291,15 @@ async function fetchFlightEvents() {
     });
 
     render();
-    showToast(`同期完了: フライト情報を ${EVENTS.length} 件検出しました ✓`);
+    showToast(`同期完了: フライトを ${EVENTS.length} 件抽出しました`);
   } catch (err) {
     console.error(err);
-    showToast('カレンダーからの取得に失敗しました', false);
+    showToast('データの取得に失敗しました。設定や権限を確認してください', false);
   }
 }
 
 /* ══════════════════════════════════════
-   パーサー (既存ロジックを完全引き継ぎ)
+   高性能パースロジック
 ══════════════════════════════════════ */
 const FL_RE = /^(\d{1,4})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(FO|DEADHEAD|OBS)/;
 const DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+(\d+)\s+(\w+)\s+(\d{4})/;
@@ -347,10 +348,9 @@ function calcDepUTC(evStartISO, depHHMM, depAirport, flightDate){
 }
 function toLocalHHMM(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return String(l.getUTCHours()).padStart(2,'0')+String(l.getUTCMinutes()).padStart(2,'0'); }
 function toLocalDateStr(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return `${l.getUTCMonth()+1}/${l.getUTCDate()} ${String(l.getUTCHours()).padStart(2,'0')}:${String(l.getUTCMinutes()).padStart(2,'0')}`; }
-function toGCalDate(d){ return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
 
 /* ══════════════════════════════════════
-   UI 描画
+   UI 画面レンダリング
 ══════════════════════════════════════ */
 let currentTab='all';
 function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); render(); }
@@ -358,14 +358,12 @@ function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x
 function buildCard(ev){
   const flights=parseFlights(ev.desc);
   const pairs=parseStayPairs(ev.desc);
-  const stayNums=new Set(pairs.map(p=>p.num));
   const isPairs=pairs.length>0;
 
   const badgeCls=isPairs?'b-stay':(flights.length?'b-fly':'b-other');
   const badgeTxt=isPairs?'STAY':'FLY';
   const dateLabel=`${new Date(ev.start).getUTCMonth()+1}/${new Date(ev.start).getUTCDate()}`;
 
-  // タイムライン構築
   let tlHTML = '';
   flights.forEach((f) => {
     tlHTML += `<div class="tl-item fl"><span class="tl-time">${f.dep}–${f.arr}</span><span style="color:var(--text)">JL${f.num}</span> <span style="font-size:11px;color:var(--text2)">${f.from}→${f.to}</span> <span class="role-tag ${f.role==='FO'?'role-fo':'role-dh'}">${f.role}</span></div>`;
@@ -396,7 +394,6 @@ function buildCard(ev){
     `;
   }).join('');
 
-  // 一括登録メタデータ埋め込み
   const bulkData = pairs.map(p => {
     const depUTC = calcDepUTC(ev.start, p.dep, p.from, p.date); if(!depUTC) return null;
     const off = tzOff(p.from); const a18 = new Date(depUTC.getTime()-18*3600000); const a8 = new Date(depUTC.getTime()-8*3600000);
@@ -441,7 +438,7 @@ function render(){
   let evs = EVENTS;
   if(currentTab==='stay') evs = EVENTS.filter(e=>hasHotel(e.desc));
   if(currentTab==='alert') evs = EVENTS.filter(e=>parseStayPairs(e.desc).length>0);
-  document.getElementById('container').innerHTML = evs.length ? evs.map(buildCard).join('') : '<div style="text-align:center;padding:40px;color:var(--text3)">フライト予定をカレンダーから取得してください</div>';
+  document.getElementById('container').innerHTML = evs.length ? evs.map(buildCard).join('') : '<div style="text-align:center;padding:40px;color:var(--text3)">カレンダーから同期を行うとここに表示されます</div>';
 }
 
 /* ══════════════════════════════════════
@@ -453,41 +450,39 @@ function clearSelection(){ selectedIds.forEach(id => { const c = document.getEle
 
 async function execBulkRegister(){
   if (!gapiInited) return;
-  showToast('裏側でカレンダーにまとめて一括登録中...');
+  showToast('裏側でカレンダーへ一括登録中...');
   
   for (const evId of selectedIds) {
     const card = document.getElementById(`card_${evId}`); if(!card) continue;
     const bulkData = JSON.parse(decodeURIComponent(card.dataset.bulk));
     
     for (const d of bulkData) {
-      // 1. 追検予定の裏側登録
       if (!registered[d.tsuikenKey]) {
         try {
           await gapi.client.calendar.events.insert({
             calendarId: TARGET_CAL_ID,
-            resource: { summary: d.tsuikenSummary, start: { dateTime: d.start18 }, end: { dateTime: d.end8 }, description: '追検アラートより自動一括登録' }
+            resource: { summary: d.tsuikenSummary, start: { dateTime: d.start18 }, end: { dateTime: d.end8 }, description: '追検自動一括登録' }
           });
           registered[d.tsuikenKey] = true;
         } catch(e) { console.error(e); }
       }
-      // 2. 移動予定の裏側登録
       if (d.idoSummary && !registered[d.idoKey]) {
         try {
           const depDate = new Date(d.depISO);
           const endIdo = new Date(depDate.getTime() + 60 * 60 * 1000).toISOString();
           await gapi.client.calendar.events.insert({
             calendarId: IDO_CAL_ID,
-            resource: { summary: d.idoSummary, start: { dateTime: d.depISO }, end: { dateTime: endIdo }, description: '移動情報自動登録' }
+            resource: { summary: d.idoSummary, start: { dateTime: d.depISO }, end: { dateTime: endIdo }, description: '移動自動一括登録' }
           });
           registered[d.idoKey] = true;
         } catch(e) { console.error(e); }
       }
     }
   }
-  saveStore(); render(); clearSelection(); showToast('選択したフライトの追検・移動情報を一括登録しました ✓');
+  saveStore(); render(); clearSelection(); showToast('カレンダーへ一括登録しました ✓');
 }
 
-function showToast(msg, ok=true){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
 </script>
 </body>
 </html>
