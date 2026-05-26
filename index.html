@@ -220,7 +220,7 @@ function saveConfig() {
 
 function initGoogleAPI() {
   const apiKey = localStorage.getItem('cfg_api_key');
-  const clientId = localStorage.getItem('cfg_src_cal_id'); // 内部キー
+  const clientId = localStorage.getItem('cfg_src_cal_id');
   
   document.getElementById('cfg-api-key').value = apiKey || '';
   document.getElementById('cfg-client-id').value = clientId || '';
@@ -253,7 +253,7 @@ function getAccessToken() {
 }
 
 /* ══════════════════════════════════════
-   カレンダーからメモ付きフライト情報を自動吸い出し
+   カレンダーからフライト情報を自動吸い出し
 ══════════════════════════════════════ */
 async function fetchFlightEvents() {
   if (!gapiInited || !gisInited) { showToast('⚙設定を開き、APIキーとクライアントIDを設定してください', false); toggleConfig(); return; }
@@ -262,10 +262,10 @@ async function fetchFlightEvents() {
     await getAccessToken();
     showToast('Googleカレンダーから情報を同期中...');
     
-    const srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary'; // タイポ修正済
+    const srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
     const now = new Date();
-    const timeMin = now.toISOString();
-    const timeMax = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const timeMin = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2日前から取得
+    const timeMax = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(); // 60日先まで取得
 
     const response = await gapi.client.calendar.events.list({
       calendarId: srcCalId,
@@ -279,13 +279,14 @@ async function fetchFlightEvents() {
     EVENTS = [];
 
     items.forEach(item => {
-      // メモ欄（description）にフライト固有のキーワードがあるものを自動識別
-      if (item.description && (item.description.includes('Check-in') || item.description.includes('Hotel') || item.description.includes('DEADHEAD') || item.description.includes('FO'))) {
+      const text = (item.summary || '') + '\n' + (item.description || '');
+      // 新しいフライトログ形式（Check-in、Hotel、FO、Pairing idなど）を柔軟に検出
+      if (text.includes('Check-in') || text.includes('Hotel') || text.includes('FO') || text.includes('Pairing id') || text.includes('DEADHEAD')) {
         EVENTS.push({
           id: item.id,
           summary: item.summary || 'フライトスケジュール',
           start: item.start.dateTime || item.start.date,
-          desc: item.description
+          desc: item.description || ''
         });
       }
     });
@@ -299,18 +300,25 @@ async function fetchFlightEvents() {
 }
 
 /* ══════════════════════════════════════
-   高性能パースロジック
+   フライトログ専用 高性能パースロジック
 ══════════════════════════════════════ */
 const FL_RE = /^(\d{1,4})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(FO|DEADHEAD|OBS)/;
-const DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+(\d+)\s+(\w+)\s+(\d{4})/;
-const MONTHS = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+const DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+(\d+)\s+(\w+)\s+(\d{4})/i;
+const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 
 function parseFlights(desc){
   const lines = desc.split('\n').map(l=>l.trim()).filter(Boolean);
   const result = []; let curDate = null;
   for(const l of lines){
-    const dm = l.match(DATE_RE); if(dm){ curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2]], +dm[1])); continue; }
-    const m = l.match(FL_RE); if(m) result.push({num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:curDate});
+    const dm = l.match(DATE_RE);
+    if(dm){
+      curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1]));
+      continue;
+    }
+    const m = l.match(FL_RE);
+    if(m && curDate) {
+      result.push({num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(curDate.getTime())});
+    }
   }
   return result;
 }
@@ -319,17 +327,29 @@ function parseStayPairs(desc){
   const lines = desc.split('\n').map(l=>l.trim()).filter(Boolean);
   let curDate = null; const tagged = [];
   for(const l of lines){
-    const dm = l.match(DATE_RE); if(dm){ curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2]], +dm[1])); tagged.push({type:'date',date:curDate}); continue; }
+    const dm = l.match(DATE_RE);
+    if(dm){
+      curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1]));
+      tagged.push({type:'date',date:curDate});
+      continue;
+    }
     if(/^Hotel\s/i.test(l)){ tagged.push({type:'hotel'}); continue; }
-    const tm = l.match(/^Transport\s+(\d{2}:\d{2})/); if(tm){ tagged.push({type:'transport', time:tm[1], date:curDate}); continue; }
-    const cm = l.match(/^Check-in\s+(\d{2}:\d{2})\s+([A-Z]{3})/); if(cm){ tagged.push({type:'checkin', time:cm[1], airport:cm[2], date:curDate}); continue; }
-    const m = l.match(FL_RE); if(m) tagged.push({type:'flight',num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:curDate});
+    const tm = l.match(/^Transport\s+(\d{2}:\d{2})/i); if(tm){ tagged.push({type:'transport', time:tm[1], date:new Date(curDate.getTime())}); continue; }
+    const cm = l.match(/^Check-in\s+(\d{2}:\d{2})\s+([A-Z]{3})/i); if(cm){ tagged.push({type:'checkin', time:cm[1], airport:cm[2], date:new Date(curDate.getTime())}); continue; }
+    const m = l.match(FL_RE);
+    if(m && curDate) tagged.push({type:'flight',num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(curDate.getTime())});
   }
   const pairs = [];
   for(let i=0;i<tagged.length;i++){
     if(tagged[i].type !== 'hotel') continue;
     let foFlight = null;
-    for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type === 'flight'){ if(tagged[j].role === 'DEADHEAD') continue; foFlight = tagged[j]; break; } }
+    for(let j=i+1;j<tagged.length;j++){
+      if(tagged[j].type === 'flight'){
+        if(tagged[j].role === 'DEADHEAD') continue;
+        foFlight = tagged[j];
+        break;
+      }
+    }
     if(!foFlight) continue;
     let pickup = null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type === 'transport'){ pickup = tagged[j]; break; } if(tagged[j].type === 'flight') break; }
     let showup = null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type === 'checkin'){ showup = tagged[j]; } if(tagged[j].type === 'flight' && tagged[j].num === foFlight.num) break; }
@@ -337,11 +357,16 @@ function parseStayPairs(desc){
   }
   return pairs;
 }
-function hasHotel(desc){ return /^Hotel\s/im.test(desc); }
+
+function hasHotel(desc){ return /Hotel\s/i.test(desc); }
 
 function calcDepUTC(evStartISO, depHHMM, depAirport, flightDate){
   const [hh,mm] = depHHMM.split(':').map(Number);
-  if(flightDate){ const t = new Date(flightDate); t.setUTCHours(hh, mm, 0, 0); return t; }
+  if(flightDate){
+    const t = new Date(flightDate.getTime());
+    t.setUTCHours(hh, mm, 0, 0);
+    return t;
+  }
   const base = new Date(evStartISO);
   for(let d=-1;d<6;d++){ const t = new Date(base); t.setUTCDate(t.getUTCDate()+d); t.setUTCHours(hh, mm, 0, 0); if(t >= base) return t; }
   return null;
@@ -438,7 +463,7 @@ function render(){
   let evs = EVENTS;
   if(currentTab==='stay') evs = EVENTS.filter(e=>hasHotel(e.desc));
   if(currentTab==='alert') evs = EVENTS.filter(e=>parseStayPairs(e.desc).length>0);
-  document.getElementById('container').innerHTML = evs.length ? evs.map(buildCard).join('') : '<div style="text-align:center;padding:40px;color:var(--text3)">カレンダーから同期を行うとここに表示されます</div>';
+  document.getElementById('container').innerHTML = evs.length ? evs.map(buildCard).join('') : '<div style="text-align:center;padding:40px;color:var(--text3)">フライトデータが同期されるとここにタイムラインと追検情報が展開されます</div>';
 }
 
 /* ══════════════════════════════════════
