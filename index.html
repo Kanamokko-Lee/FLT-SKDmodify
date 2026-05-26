@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma\" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="theme-color" content="#0a0e1a">
+<title>追検アラート</title>
+
+<style>
+:root {
+  --bg:       #0a0e1a;
+  --bg2:      #111827;
+  --bg3:      #1a2235;
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.13);
+  --text:     #e8edf5;
+  --text2:    #8a9bb5;
+  --text3:    #4a5a72;
+  --blue:     #4a9eff;
+  --blue-dim: rgba(74,158,255,0.12);
+  --green:    #34c78a;
+  --green-dim:rgba(52,199,138,0.12);
+  --amber:    #f5a623;
+  --amber-dim:rgba(245,166,35,0.12);
+  --red:      #ff4a5a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+body { background: var(--bg); color: var(--text); padding-bottom: 100px; -webkit-tap-highlight-color: transparent; }
+
+/* ヘッダー・レイアウト */
+header { background: var(--bg2); padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+h1 { font-size: 18px; font-weight: 600; }
+.btn-group { display: flex; gap: 8px; }
+button { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+button:active { opacity: 0.7; }
+button.primary { background: var(--blue); color: #000; border: none; font-weight: 600; }
+
+/* 設定モーダル */
+.config-panel { background: var(--bg2); border: 1px solid var(--border2); padding: 16px; margin: 12px; border-radius: 12px; display: none; }
+.config-panel.show { display: block; }
+.config-title { font-size: 14px; font-weight: bold; margin-bottom: 12px; color: var(--blue); }
+.config-field { margin-bottom: 10px; }
+.config-field label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+.config-field input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); padding: 8px; border-radius: 6px; color: var(--text); font-size: 13px; }
+
+/* 入力エリア */
+.input-section { padding: 12px; }
+textarea { width: 100%; height: 120px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 12px; color: var(--text); font-size: 14px; resize: none; outline: none; }
+textarea:focus { border-color: var(--blue); }
+
+/* リスト・カード */
+.list-section { padding: 0 12px; display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 14px; position: relative; transition: border-color 0.2s; }
+.card.selected { border-color: var(--blue); background: rgba(74,158,255,0.03); }
+.card.registered { opacity: 0.6; }
+.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.flight-num { font-size: 16px; font-weight: 700; color: var(--blue); }
+.status-badge { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.status-badge.waiting { background: var(--amber-dim); color: var(--amber); }
+.status-badge.done { background: var(--green-dim); color: var(--green); }
+.time-row { font-size: 13px; color: var(--text2); margin-top: 4px; display: flex; justify-content: space-between; }
+.time-val { color: var(--text); font-weight: 500; }
+.checkbox-zone { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer; z-index: 1; }
+
+/* フッター（一括処理） */
+footer { position: fixed; bottom: 0; left: 0; width: 100%; background: rgba(17,24,39,0.9); backdrop-filter: blur(12px); border-top: 1px solid var(--border); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; transform: translateY(100%); transition: transform 0.3s; z-index: 90; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+footer.show { transform: translateY(0); }
+.select-count { font-size: 14px; color: var(--text2); }
+
+/* 共通パーツ */
+#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: #e8edf5; color: #0a0e1a; padding: 12px 20px; border-radius: 30px; font-size: 14px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 1000; transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.25); pointer-events: none; white-space: nowrap; }
+#toast.show { transform: translateX(-50%) translateY(0); }
+#offline-banner { background: var(--red); color: #fff; padding: 4px; text-align: center; font-size: 11px; font-weight: bold; display: none; }
+#offline-banner.show { display: block; }
+.install-btn { display: none; background: var(--blue-dim); color: var(--blue); border: 1px solid var(--blue); }
+.install-btn.visible { display: block; }
+</style>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
+</head>
+<body>
+
+<div id="offline-banner">オフラインモード</div>
+
+<header>
+  <h1>追検アラート</h1>
+  <div class="btn-group">
+    <button id="install-btn" class="install-btn">アプリをインストール</button>
+    <button id="toggle-config-btn" onclick="toggleConfig()">⚙️ 設定</button>
+  </div>
+</header>
+
+<div id="config-panel" class="config-panel">
+  <div class="config-title">Google API 連携設定 (ブラウザに保存されます)</div>
+  <div class="config-field">
+    <label>Google API Key</label>
+    <input type="password" id="cfg-api-key" placeholder="AIzaSy...">
+  </div>
+  <div class="config-field">
+    <label>OAuth クライアント ID</label>
+    <input type="text" id="cfg-client-id" placeholder="xxxx.apps.googleusercontent.com">
+  </div>
+  <div class="config-field">
+    <label>登録先カレンダーID (未入力の場合はメインカレンダー)</label>
+    <input type="text" id="cfg-cal-id" placeholder="primary">
+  </div>
+  <button class="primary" style="width:100%; justify-content:center; margin-top:8px;" onclick="saveConfig()">設定を保存して認証初期化</button>
+</div>
+
+<div class="input-section">
+  <textarea id="raw-input" placeholder="ここにペアリング、またはフライト情報を貼り付けてください..." oninput="processInput()"></textarea>
+</div>
+
+<div id="list-section" class="list-section"></div>
+
+<footer id="footer">
+  <div class="select-count"><span id="selected-num">0</span> 件選択中</div>
+  <button class="primary" onclick="execBulkRegister()">裏で一括カレンダー登録</button>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════
+   状態管理・初期化
+══════════════════════════════════════ */
+let events = [];
+let selectedIds = new Set();
+let registered = JSON.parse(localStorage.getItem('tsuiken_registered') || '{}');
+
+// Google APIクライアント状態
+let gapiInited = false;
+let gisInited = false;
+let tokenClient;
+
+function loadStore() { registered = JSON.parse(localStorage.getItem('tsuiken_registered') || '{}'); }
+function saveStore(obj) { localStorage.setItem('tsuiken_registered', JSON.stringify(obj)); }
+
+window.addEventListener('load', () => {
+  initGoogleAPI();
+});
+
+/* ══════════════════════════════════════
+   Google Calendar API 認証設定
+══════════════════════════════════════ */
+function toggleConfig() {
+  document.getElementById('config-panel').classList.toggle('show');
+}
+
+function saveConfig() {
+  localStorage.setItem('cfg_api_key', document.getElementById('cfg-api-key').value.trim());
+  localStorage.setItem('cfg_client_id', document.getElementById('cfg-client-id').value.trim());
+  localStorage.setItem('cfg_cal-id', document.getElementById('cfg-cal-id').value.trim() || 'primary');
+  showToast('設定を保存しました。再初期化します。');
+  toggleConfig();
+  initGoogleAPI();
+}
+
+function initGoogleAPI() {
+  const apiKey = localStorage.getItem('cfg_api_key');
+  const clientId = localStorage.getItem('cfg_client_id');
+  
+  document.getElementById('cfg-api-key').value = apiKey || '';
+  document.getElementById('cfg-client-id').value = clientId || '';
+  document.getElementById('cfg-cal-id').value = localStorage.getItem('cfg_cal-id') || 'primary';
+
+  if (!apiKey || !clientId) {
+    console.warn('Google API 設定が未完了です。⚙️設定 から入力してください。');
+    return;
+  }
+
+  // GAPI 初期化
+  try {
+    gapi.load('client', async () => {
+      await gapi.client.init({
+        apiKey: apiKey,
+        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
+      });
+      gapiInited = true;
+    });
+
+    // GIS (Google Identity Services) 初期化
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/calendar.events',
+      callback: '', 
+    });
+    gisInited = true;
+  } catch (e) {
+    console.error('API初期化エラー:', e);
+    showToast('API初期化に失敗しました。設定を確認してください。', false);
+  }
+}
+
+function getAccessToken() {
+  return new Promise((resolve, reject) => {
+    if (!tokenClient) {
+      reject('Google API 認証が設定されていません。');
+      return;
+    }
+    tokenClient.callback = (resp) => {
+      if (resp.error !== undefined) reject(resp);
+      resolve(resp);
+    };
+    if (gapi.client.getToken() === null) {
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+      tokenClient.requestAccessToken({ prompt: '' });
+    }
+  });
+}
+
+/* ══════════════════════════════════════
+   テキストパースロジック
+══════════════════════════════════════ */
+function processInput() {
+  const text = document.getElementById('raw-input').value;
+  events = [];
+  selectedIds.clear();
+  
+  if (!text.trim()) { render(); updateFooter(); return; }
+
+  const lines = text.split('\n');
+  let currentFlight = null;
+
+  lines.forEach((line, idx) => {
+    // 航空会社パターンに合わせたフライトナンバーの抽出（例：NH211, JL062 など）
+    const flightMatch = line.match(/([A-Z]{2})\s*(\d{3,4})\b/);
+    // 日付パターン (MM/DD または MM-DD)
+    const dateMatch = line.match(/(\d{1,2})[\/\-](\d{1,2})/);
+    // 到着時刻パターン (STA もしくは 4桁の数字)
+    const timeMatch = line.match(/\b(\d{2})[:\s]?(\d{2})\b/);
+
+    if (flightMatch) {
+      let dateObj = new Date();
+      if (dateMatch) {
+        dateObj.setMonth(parseInt(dateMatch[1]) - 1);
+        dateObj.setDate(parseInt(dateMatch[2]));
+      }
+      
+      currentFlight = {
+        id: 'ev_' + idx + '_' + Math.random().toString(36).substr(2, 4),
+        flightNum: flightMatch[1] + flightMatch[2],
+        date: new Date(dateObj),
+        staStr: '00:00'
+      };
+
+      if (timeMatch && !dateMatch) {
+        currentFlight.staStr = `${timeMatch[1]}:${timeMatch[2]}`;
+      }
+      
+      // 到着（ステイ）ベースで追検時間を計算
+      calculateTsuikenWindows(currentFlight);
+      events.push(currentFlight);
+    }
+  });
+
+  render();
+  updateFooter();
+}
+
+function calculateTsuikenWindows(flt) {
+  // STAを基に基準時刻を生成
+  const [h, m] = flt.staStr.split(':').map(Number);
+  let baseTime = new Date(flt.date);
+  baseTime.setHours(h, m, 0, 0);
+
+  // 1. 移動時間帯 (STAから2時間後〜3時間後と仮定)
+  flt.idoStart = new Date(baseTime.getTime() + 2 * 60 * 60 * 1000);
+  flt.idoEnd = new Date(baseTime.getTime() + 3 * 60 * 60 * 1000);
+
+  // 2. 追検義務時間帯 (出頭前の18時間前〜8時間前の必須ウィンドウ)
+  // ここでは例として、翌日の同時刻を出頭と仮定した計算（運用に合わせて調整可能）
+  let shuttoTime = new Date(baseTime.getTime() + 24 * 60 * 60 * 1000); 
+  flt.tsuikenStart = new Date(shuttoTime.getTime() - 18 * 60 * 60 * 1000);
+  flt.tsuikenEnd = new Date(shuttoTime.getTime() - 8 * 60 * 60 * 1000);
+
+  // 一括登録用のキー（同一便名・日付での重複判定用）
+  const dateKey = `${flt.date.getFullYear()}-${flt.date.getMonth()+1}-${flt.date.getDate()}`;
+  flt.key_ido = `ido_${flt.flightNum}_${dateKey}`;
+  flt.key_tsuiken = `tsuiken_${flt.flightNum}_${dateKey}`;
+}
+
+/* ══════════════════════════════════════
+   画面描画 UI
+══════════════════════════════════════ */
+function render() {
+  const container = document.getElementById('list-section');
+  container.innerHTML = '';
+
+  if (events.length === 0) {
+    container.innerHTML = '<div style="text-align:center; color:var(--text3); margin-top:40px; font-size:14px;">データがありません</div>';
+    return;
+  }
+
+  events.forEach(flt => {
+    const isIdoReg = registered[flt.key_ido];
+    const isTsuikenReg = registered[flt.key_tsuiken];
+
+    // 移動時間帯カード
+    const cardIdo = createCardElement(flt, flt.id + '_ido', `【移動】${flt.flightNum} ステイ先`, flt.idoStart, flt.idoEnd, isIdoReg, flt.key_ido);
+    container.appendChild(cardIdo);
+
+    // 追検時間帯カード
+    const cardTsuiken = createCardElement(flt, flt.id + '_tsui', `【追検】${flt.flightNum} ウィンドウ`, flt.tsuikenStart, flt.tsuikenEnd, isTsuikenReg, flt.key_tsuiken);
+    container.appendChild(cardTsuiken);
+  });
+}
+
+function createCardElement(flt, uniqueId, title, start, end, isReg, regKey) {
+  const card = document.createElement('div');
+  card.className = `card ${selectedIds.has(uniqueId) ? 'selected' : ''} ${isReg ? 'registered' : ''}`;
+  card.id = `card_${uniqueId}`;
+  
+  // 登録用データをメタデータとして保持
+  const bulkData = {
+    summary: title,
+    startISO: start.toISOString(),
+    endISO: end.toISOString(),
+    key: regKey
+  };
+  card.dataset.bulk = encodeURIComponent(JSON.stringify(bulkData));
+
+  const formatTime = d => `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const formatDate = d => `${d.getMonth()+1}/${d.getDate()}`;
+
+  card.innerHTML = `
+    <div class="checkbox-zone" onclick="toggleSelect('${uniqueId}')"></div>
+    <div class="card-header">
+      <span class="flight-num">${title}</span>
+      <span class="status-badge ${isReg ? 'done' : 'waiting'}">${isReg ? '登録済' : '未登録'}</span>
+    </div>
+    <div class="time-row">
+      <span>日付: <span class="time-val">${formatDate(start)}</span></span>
+      <span>時間: <span class="time-val">${formatTime(start)} 〜 ${formatTime(end)}</span></span>
+    </div>
+  `;
+  return card;
+}
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+  } else {
+    selectedIds.add(id);
+  }
+  render();
+  updateFooter();
+}
+
+function updateFooter() {
+  const footer = document.getElementById('footer');
+  const numSpan = document.getElementById('selected-num');
+  numSpan.innerText = selectedIds.size;
+  if (selectedIds.size > 0) {
+    footer.classList.add('show');
+  } else {
+    footer.classList.remove('show');
+  }
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  render();
+  updateFooter();
+}
+
+/* ══════════════════════════════════════
+   APIを使用した【裏での一括登録実行】
+══════════════════════════════════════ */
+async function execBulkRegister() {
+  if (!gapiInited || !gisInited) { 
+    showToast('⚙️設定 からAPIキーとクライアントIDを登録してください', false); 
+    toggleConfig();
+    return; 
+  }
+
+  // 1. Google アカウントの認証確認（必要なら一瞬だけポップアップが出ます）
+  try {
+    await getAccessToken();
+  } catch (e) {
+    console.error(e);
+    showToast('Google認証に失敗、またはキャンセルされました', false);
+    return;
+  }
+
+  const calId = localStorage.getItem('cfg_cal-id') || 'primary';
+  const tasks = [];
+
+  selectedIds.forEach(id => {
+    const card = document.getElementById(`card_${id}`);
+    if (!card) return;
+    const taskData = JSON.parse(decodeURIComponent(card.dataset.bulk));
+    tasks.push(taskData);
+  });
+
+  if (tasks.length === 0) { showToast('登録対象がありません'); return; }
+
+  showToast(`${tasks.length}件を裏でカレンダーへ登録中...`, true);
+
+  let successCount = 0;
+
+  // 2. 画面を遷移させず、バックグラウンドで連続HTTPリクエストを送信
+  for (const task of tasks) {
+    try {
+      await gapi.client.calendar.events.insert({
+        calendarId: calId,
+        resource: {
+          summary: task.summary,
+          start: { dateTime: task.startISO, timeZone: 'Asia/Tokyo' },
+          end: { dateTime: task.endISO, timeZone: 'Asia/Tokyo' },
+          description: '追検アラートアプリからの自動登録'
+        }
+      });
+      registered[task.key] = true;
+      successCount++;
+    } catch (err) {
+      console.error('API登録エラー:', err);
+    }
+  }
+
+  // 3. ローカルストレージを同期し、UIを更新
+  saveStore(registered);
+  render();
+  clearSelection();
+  showToast(`一括登録が完了しました（成功: ${successCount}件） ✓`);
+}
+
+/* ══════════════════════════════════════
+   ユーティリティ (Toast / ネットワーク状況)
+══════════════════════════════════════ */
+let toastTimer;
+function showToast(msg, persist = false) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  if (!persist) {
+    toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+  }
+}
+
+function updateOnline(){
+  document.getElementById('offline-banner').classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', updateOnline);
+window.addEventListener('offline', updateOnline);
+updateOnline();
+</script>
+</body>
+</html>
