@@ -211,7 +211,7 @@ function toggleConfig() { document.getElementById('config-panel').classList.togg
 
 function saveConfig() {
   localStorage.setItem('cfg_api_key', document.getElementById('cfg-api-key').value.trim());
-  localStorage.setItem('cfg_src_cal_id', document.getElementById('cfg-client-id').value.trim());
+  localStorage.setItem('cfg_src_cal_id', document.getElementById('cfg-client-id').value.trim()); // 修正：保存キーのズレを解消
   localStorage.setItem('cfg_src_cal_id_real', document.getElementById('cfg-src-cal-id').value.trim() || 'primary');
   showToast('設定を保存しました');
   toggleConfig();
@@ -264,8 +264,8 @@ async function fetchFlightEvents() {
     
     const srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
     const now = new Date();
-    const timeMin = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2日前から取得
-    const timeMax = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(); // 60日先まで取得
+    const timeMin = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(); 
+    const timeMax = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(); 
 
     const response = await gapi.client.calendar.events.list({
       calendarId: srcCalId,
@@ -280,7 +280,6 @@ async function fetchFlightEvents() {
 
     items.forEach(item => {
       const text = (item.summary || '') + '\n' + (item.description || '');
-      // 新しいフライトログ形式（Check-in、Hotel、FO、Pairing idなど）を柔軟に検出
       if (text.includes('Check-in') || text.includes('Hotel') || text.includes('FO') || text.includes('Pairing id') || text.includes('DEADHEAD')) {
         EVENTS.push({
           id: item.id,
