@@ -69,7 +69,7 @@ button.header-btn { background: var(--bg3); color: var(--text); border: 1px soli
 .tab.active { color: var(--bg); background: var(--text); border-color: var(--text); }
 main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 
-/* ── カード・タイムライン・各種表示 ── */
+/* ── カード・タイムライン表示群 ── */
 .ev-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
 .ev-card.has-alert { border-color: rgba(74,158,255,0.2); }
 .ev-header { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; }
@@ -114,8 +114,6 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 
 #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e2d45; color: var(--text); font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 100px; border: 1px solid rgba(74,158,255,0.3); z-index: 9999; opacity: 0; pointer-events: none; transition: opacity .3s; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
 #toast.show { opacity: 1; }
-#offline-banner { display: none; background: rgba(245,166,35,0.12); border-bottom: 1px solid rgba(245,166,35,0.3); color: var(--amber); font-size: 12px; font-weight: 600; text-align: center; padding: 6px; }
-#offline-banner.show { display: block; }
 
 .card-checkbox { width: 20px; height: 20px; accent-color: var(--blue); cursor: pointer; }
 #bulk-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 100px; padding: 10px 16px; box-shadow: 0 8px 32px rgba(0,0,0,.6); z-index: 200; }
@@ -123,13 +121,10 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 #bulk-bar-btn { padding: 8px 18px; font-size: 13px; font-weight: 700; color: var(--bg); background: linear-gradient(135deg, var(--blue), var(--green)); border: none; border-radius: 100px; cursor: pointer; }
 </style>
 
-<!-- Google API SDK -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
 <body>
-
-<div id="offline-banner">⚠ オフラインモード</div>
 
 <header class="app-header">
   <div class="header-inner">
@@ -149,7 +144,6 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
   </div>
 </header>
 
-<!-- 環境設定パネル -->
 <div id="config-panel" class="config-panel">
   <div class="config-title">Google API 連携設定</div>
   <div class="config-field">
@@ -158,10 +152,10 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
   </div>
   <div class="config-field">
     <label>OAuth クライアント ID</label>
-    <input type="text" id="cfg-client-id" placeholder="xxxx.apps.googleusercontent.com">
+    <input type="text" id="cfg-client-id" placeholder="xxxx-xxxx.apps.googleusercontent.com">
   </div>
   <div class="config-field">
-    <label>読み込み元フライトカレンダーID (空欄ならメインカレンダー)</label>
+    <label>読み込み元フライトカレンダー名 / ID (空欄ならメイン)</label>
     <input type="text" id="cfg-src-cal-id" placeholder="primary">
   </div>
   <button class="header-btn" style="width:100%; justify-content:center; background:var(--blue); color:#000; margin-top:8px;" onclick="saveConfig()">設定を保存</button>
@@ -210,21 +204,28 @@ window.addEventListener('load', () => { initGoogleAPI(); });
 function toggleConfig() { document.getElementById('config-panel').classList.toggle('show'); }
 
 function saveConfig() {
+  let rawClientId = document.getElementById('cfg-client-id').value.trim();
+  // 先頭の http// や http:// を強制除去
+  rawClientId = rawClientId.replace(/^https?:\/*/, '');
+
   localStorage.setItem('cfg_api_key', document.getElementById('cfg-api-key').value.trim());
-  localStorage.setItem('cfg_src_cal_id', document.getElementById('cfg-client-id').value.trim()); // 修正：保存キーのズレを解消
+  localStorage.setItem('cfg_src_client_id_fixed', rawClientId); 
   localStorage.setItem('cfg_src_cal_id_real', document.getElementById('cfg-src-cal-id').value.trim() || 'primary');
-  showToast('設定を保存しました');
+  
+  showToast('設定をクリーン保存しました');
   toggleConfig();
   initGoogleAPI();
 }
 
 function initGoogleAPI() {
   const apiKey = localStorage.getItem('cfg_api_key');
-  const clientId = localStorage.getItem('cfg_src_cal_id');
+  // 過去のゴミデータを参照しないよう、固定キーから取得
+  const clientId = localStorage.getItem('cfg_src_client_id_fixed');
+  const calId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
   
   document.getElementById('cfg-api-key').value = apiKey || '';
   document.getElementById('cfg-client-id').value = clientId || '';
-  document.getElementById('cfg-src-cal-id').value = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
+  document.getElementById('cfg-src-cal-id').value = calId === 'primary' ? '' : calId;
 
   if (!apiKey || !clientId) return;
 
@@ -253,16 +254,23 @@ function getAccessToken() {
 }
 
 /* ══════════════════════════════════════
-   カレンダーからフライト情報を自動吸い出し
+   カレンダーから予定を取得
 ══════════════════════════════════════ */
 async function fetchFlightEvents() {
-  if (!gapiInited || !gisInited) { showToast('⚙設定を開き、APIキーとクライアントIDを設定してください', false); toggleConfig(); return; }
+  if (!gapiInited || !gisInited) { showToast('⚙設定を開き、APIキーとクライアントIDを設定してください'); toggleConfig(); return; }
   
   try {
     await getAccessToken();
     showToast('Googleカレンダーから情報を同期中...');
     
-    const srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
+    // カレンダー名（「2フライト」など）が入っている場合は、まずそのカレンダーのIDを探す
+    let srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
+    if (srcCalId !== 'primary' && !srcCalId.includes('@')) {
+      const listRes = await gapi.client.calendar.calendarList.list();
+      const found = (listRes.result.items || []).find(c => c.summary === srcCalId);
+      if (found) srcCalId = found.id;
+    }
+
     const now = new Date();
     const timeMin = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(); 
     const timeMax = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(); 
@@ -294,12 +302,12 @@ async function fetchFlightEvents() {
     showToast(`同期完了: フライトを ${EVENTS.length} 件抽出しました`);
   } catch (err) {
     console.error(err);
-    showToast('データの取得に失敗しました。設定や権限を確認してください', false);
+    showToast('データの取得に失敗しました。設定や権限を確認してください');
   }
 }
 
 /* ══════════════════════════════════════
-   フライトログ専用 高性能パースロジック
+   フライトログ専用 パースロジック
 ══════════════════════════════════════ */
 const FL_RE = /^(\d{1,4})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(FO|DEADHEAD|OBS)/;
 const DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+(\d+)\s+(\w+)\s+(\d{4})/i;
@@ -310,14 +318,9 @@ function parseFlights(desc){
   const result = []; let curDate = null;
   for(const l of lines){
     const dm = l.match(DATE_RE);
-    if(dm){
-      curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1]));
-      continue;
-    }
+    if(dm){ curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1])); continue; }
     const m = l.match(FL_RE);
-    if(m && curDate) {
-      result.push({num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(curDate.getTime())});
-    }
+    if(m && curDate) result.push({num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(curDate.getTime())});
   }
   return result;
 }
@@ -327,11 +330,7 @@ function parseStayPairs(desc){
   let curDate = null; const tagged = [];
   for(const l of lines){
     const dm = l.match(DATE_RE);
-    if(dm){
-      curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1]));
-      tagged.push({type:'date',date:curDate});
-      continue;
-    }
+    if(dm){ curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1])); tagged.push({type:'date',date:curDate}); continue; }
     if(/^Hotel\s/i.test(l)){ tagged.push({type:'hotel'}); continue; }
     const tm = l.match(/^Transport\s+(\d{2}:\d{2})/i); if(tm){ tagged.push({type:'transport', time:tm[1], date:new Date(curDate.getTime())}); continue; }
     const cm = l.match(/^Check-in\s+(\d{2}:\d{2})\s+([A-Z]{3})/i); if(cm){ tagged.push({type:'checkin', time:cm[1], airport:cm[2], date:new Date(curDate.getTime())}); continue; }
@@ -343,11 +342,7 @@ function parseStayPairs(desc){
     if(tagged[i].type !== 'hotel') continue;
     let foFlight = null;
     for(let j=i+1;j<tagged.length;j++){
-      if(tagged[j].type === 'flight'){
-        if(tagged[j].role === 'DEADHEAD') continue;
-        foFlight = tagged[j];
-        break;
-      }
+      if(tagged[j].type === 'flight'){ if(tagged[j].role === 'DEADHEAD') continue; foFlight = tagged[j]; break; }
     }
     if(!foFlight) continue;
     let pickup = null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type === 'transport'){ pickup = tagged[j]; break; } if(tagged[j].type === 'flight') break; }
@@ -361,11 +356,7 @@ function hasHotel(desc){ return /Hotel\s/i.test(desc); }
 
 function calcDepUTC(evStartISO, depHHMM, depAirport, flightDate){
   const [hh,mm] = depHHMM.split(':').map(Number);
-  if(flightDate){
-    const t = new Date(flightDate.getTime());
-    t.setUTCHours(hh, mm, 0, 0);
-    return t;
-  }
+  if(flightDate){ const t = new Date(flightDate.getTime()); t.setUTCHours(hh, mm, 0, 0); return t; }
   const base = new Date(evStartISO);
   for(let d=-1;d<6;d++){ const t = new Date(base); t.setUTCDate(t.getUTCDate()+d); t.setUTCHours(hh, mm, 0, 0); if(t >= base) return t; }
   return null;
@@ -374,10 +365,10 @@ function toLocalHHMM(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOf
 function toLocalDateStr(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return `${l.getUTCMonth()+1}/${l.getUTCDate()} ${String(l.getUTCHours()).padStart(2,'0')}:${String(l.getUTCMinutes()).padStart(2,'0')}`; }
 
 /* ══════════════════════════════════════
-   UI 画面レンダリング
+   UI レンダリング
 ══════════════════════════════════════ */
 let currentTab='all';
-function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); render(); }
+function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.add('active'); render(); }
 
 function buildCard(ev){
   const flights=parseFlights(ev.desc);
@@ -466,7 +457,7 @@ function render(){
 }
 
 /* ══════════════════════════════════════
-   チェックボックス・裏での一括自動登録
+   一括自動登録
 ══════════════════════════════════════ */
 function onCheckChange(chk, evId){ if(chk.checked) selectedIds.add(evId); else selectedIds.delete(evId); updateBulkBar(); }
 function updateBulkBar(){ const bar = document.getElementById('bulk-bar'); document.getElementById('bulk-bar-count').textContent = `${selectedIds.size}件選択中`; bar.style.display = selectedIds.size > 0 ? 'flex' : 'none'; }
@@ -474,7 +465,7 @@ function clearSelection(){ selectedIds.forEach(id => { const c = document.getEle
 
 async function execBulkRegister(){
   if (!gapiInited) return;
-  showToast('裏側でカレンダーへ一括登録中...');
+  showToast('カレンダーへ一括登録中...');
   
   for (const evId of selectedIds) {
     const card = document.getElementById(`card_${evId}`); if(!card) continue;
@@ -503,7 +494,7 @@ async function execBulkRegister(){
       }
     }
   }
-  saveStore(); render(); clearSelection(); showToast('カレンダーへ一括登録しました ✓');
+  saveStore(); render(); clearSelection(); showToast('選択したフライトの追検・移動情報を一括登録しました ✓');
 }
 
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
