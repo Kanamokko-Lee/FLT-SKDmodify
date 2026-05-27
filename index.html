@@ -175,8 +175,6 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 </div>
 
 <script>
-let gapiInited = false;
-let gisInited = false;
 let tokenClient = null;
 
 function onGapiLoad() {
@@ -184,21 +182,20 @@ function onGapiLoad() {
   gapi.load('client', async () => {
     try {
       await gapi.client.init({ apiKey: apiKey, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
-      gapiInited = true;
       console.log('GAPI init success');
     } catch(e) { console.error('GAPI init error:', e); }
   });
 }
 
 function onGisLoad() {
+  // すべてのキー名を「cfg_src_client_id_fixed」に完全統合
   const clientId = localStorage.getItem('cfg_src_client_id_fixed');
-  if (clientId) {
+  if (clientId && window.google) {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: 'https://www.googleapis.com/auth/calendar.events',
       callback: '', 
     });
-    gisInited = true;
     console.log('GIS init success');
   }
 }
@@ -248,20 +245,19 @@ function saveConfig() {
 ══════════════════════════════════════ */
 function getAccessToken() {
   return new Promise((resolve, reject) => {
+    // 【最重要修正】ここも「cfg_src_client_id_fixed」へ完全に統一！！
     const clientId = localStorage.getItem('cfg_src_client_id_fixed');
     if (!clientId) return reject('クライアントIDが設定されていません');
 
-    // tokenClientが未初期化ならここで強制生成
     if (!tokenClient && window.google) {
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/calendar.events',
         callback: '',
       });
-      gisInited = true;
     }
 
-    if (!tokenClient) return reject('Google SDKの初期化が完了していません。数十秒待って再度お試しください。');
+    if (!tokenClient) return reject('Google SDKの初期化が完了していません。');
 
     tokenClient.callback = (resp) => {
       if (resp.error) {
@@ -271,7 +267,6 @@ function getAccessToken() {
       resolve(resp);
     };
     
-    // 既存トークンがあれば流用、なければ強制ポップアップ
     const currentToken = gapi.client.getToken();
     if (currentToken === null) {
       tokenClient.requestAccessToken({ prompt: 'consent' });
@@ -295,7 +290,6 @@ async function fetchFlightEvents() {
   }
   
   try {
-    // 1. 認証を確実に通す（ここでポップアップが開く、または裏でトークン取得）
     await getAccessToken();
     showToast('Googleカレンダーから情報を同期中...');
     
@@ -399,9 +393,7 @@ function calcDepUTC(evStartISO, depHHMM, depAirport, flightDate){
 function toLocalHHMM(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return String(l.getUTCHours()).padStart(2,'0')+String(l.getUTCMinutes()).padStart(2,'0'); }
 function toLocalDateStr(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return `${l.getUTCMonth()+1}/${l.getUTCDate()} ${String(l.getUTCHours()).padStart(2,'0')}:${String(l.getUTCMinutes()).padStart(2,'0')}`; }
 
-/* ══════════════════════════════════════
-   UI レンダリング
-══════════════════════════════════════ */
+/* ── UI ── */
 let currentTab='all';
 function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); render(); }
 
@@ -500,12 +492,7 @@ function clearSelection(){ selectedIds.forEach(id => { const c = document.getEle
 
 async function execBulkRegister(){
   showToast('カレンダーへ一括登録中...');
-  try {
-    await getAccessToken();
-  } catch(e) {
-    showToast('認証エラーにより登録できませんでした');
-    return;
-  }
+  try { await getAccessToken(); } catch(e) { showToast('認証エラーにより登録できませんでした'); return; }
   
   for (const evId of selectedIds) {
     const card = document.getElementById(`card_${evId}`); if(!card) continue;
