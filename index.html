@@ -121,8 +121,6 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 #bulk-bar-btn { padding: 8px 18px; font-size: 13px; font-weight: 700; color: var(--bg); background: linear-gradient(135deg, var(--blue), var(--green)); border: none; border-radius: 100px; cursor: pointer; }
 </style>
 
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js" async defer></script>
 </head>
 <body>
 
@@ -177,6 +175,38 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 </div>
 
 <script>
+let gapiInited = false;
+let gisInited = false;
+let tokenClient = null;
+
+function onGapiLoad() {
+  const apiKey = localStorage.getItem('cfg_api_key');
+  gapi.load('client', async () => {
+    try {
+      await gapi.client.init({ apiKey: apiKey, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
+      gapiInited = true;
+      console.log('GAPI init success');
+    } catch(e) { console.error('GAPI init error:', e); }
+  });
+}
+
+function onGisLoad() {
+  const clientId = localStorage.getItem('cfg_src_client_id_fixed');
+  if (clientId) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/calendar.events',
+      callback: '', 
+    });
+    gisInited = true;
+    console.log('GIS init success');
+  }
+}
+</script>
+<script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" async defer></script>
+<script src="https://accounts.google.com/gsi/client" onload="onGisLoad()" async defer></script>
+
+<script>
 /* ══════════════════════════════════════
    カレンダー 登録先ID一覧
 ══════════════════════════════════════ */
@@ -190,66 +220,64 @@ let EVENTS = [];
 let selectedIds = new Set();
 let registered = JSON.parse(localStorage.getItem('tsuiken_api_registered') || '{}');
 
-let gapiInited = false;
-let gisInited = false;
-let tokenClient;
-
 function saveStore() { localStorage.setItem('tsuiken_api_registered', JSON.stringify(registered)); }
 
-window.addEventListener('load', () => { initGoogleAPI(); });
+window.addEventListener('load', () => {
+  document.getElementById('cfg-api-key').value = localStorage.getItem('cfg_api_key') || '';
+  document.getElementById('cfg-client-id').value = localStorage.getItem('cfg_src_client_id_fixed') || '';
+  const calId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
+  document.getElementById('cfg-src-cal-id').value = calId === 'primary' ? '' : calId;
+});
 
-/* ══════════════════════════════════════
-   Google API 認証・制御
-══════════════════════════════════════ */
 function toggleConfig() { document.getElementById('config-panel').classList.toggle('show'); }
 
 function saveConfig() {
   let rawClientId = document.getElementById('cfg-client-id').value.trim();
-  // 先頭の http// や http:// を強制除去
   rawClientId = rawClientId.replace(/^https?:\/*/, '');
 
   localStorage.setItem('cfg_api_key', document.getElementById('cfg-api-key').value.trim());
   localStorage.setItem('cfg_src_client_id_fixed', rawClientId); 
   localStorage.setItem('cfg_src_cal_id_real', document.getElementById('cfg-src-cal-id').value.trim() || 'primary');
   
-  showToast('設定をクリーン保存しました');
+  showToast('設定を保存しました。画面を一度リロードしてください。');
   toggleConfig();
-  initGoogleAPI();
 }
 
-function initGoogleAPI() {
-  const apiKey = localStorage.getItem('cfg_api_key');
-  // 過去のゴミデータを参照しないよう、固定キーから取得
-  const clientId = localStorage.getItem('cfg_src_client_id_fixed');
-  const calId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
-  
-  document.getElementById('cfg-api-key').value = apiKey || '';
-  document.getElementById('cfg-client-id').value = clientId || '';
-  document.getElementById('cfg-src-cal-id').value = calId === 'primary' ? '' : calId;
-
-  if (!apiKey || !clientId) return;
-
-  gapi.load('client', async () => {
-    try {
-      await gapi.client.init({ apiKey: apiKey, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
-      gapiInited = true;
-    } catch(e){ console.error(e); }
-  });
-
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: clientId,
-    scope: 'https://www.googleapis.com/auth/calendar.events',
-    callback: '',
-  });
-  gisInited = true;
-}
-
+/* ══════════════════════════════════════
+   トークンを確実に取得するプロミス
+══════════════════════════════════════ */
 function getAccessToken() {
   return new Promise((resolve, reject) => {
-    if (!tokenClient) return reject('API認証の初期設定が足りません');
-    tokenClient.callback = (resp) => { if (resp.error) reject(resp); resolve(resp); };
-    if (gapi.client.getToken() === null) tokenClient.requestAccessToken({ prompt: 'consent' });
-    else tokenClient.requestAccessToken({ prompt: '' });
+    const clientId = localStorage.getItem('cfg_src_client_id_fixed');
+    if (!clientId) return reject('クライアントIDが設定されていません');
+
+    // tokenClientが未初期化ならここで強制生成
+    if (!tokenClient && window.google) {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/calendar.events',
+        callback: '',
+      });
+      gisInited = true;
+    }
+
+    if (!tokenClient) return reject('Google SDKの初期化が完了していません。数十秒待って再度お試しください。');
+
+    tokenClient.callback = (resp) => {
+      if (resp.error) {
+        console.error('Auth error callback:', resp);
+        return reject(resp);
+      }
+      resolve(resp);
+    };
+    
+    // 既存トークンがあれば流用、なければ強制ポップアップ
+    const currentToken = gapi.client.getToken();
+    if (currentToken === null) {
+      tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+      tokenClient.requestAccessToken({ prompt: '' });
+    }
   });
 }
 
@@ -257,13 +285,20 @@ function getAccessToken() {
    カレンダーから予定を取得
 ══════════════════════════════════════ */
 async function fetchFlightEvents() {
-  if (!gapiInited || !gisInited) { showToast('⚙設定を開き、APIキーとクライアントIDを設定してください'); toggleConfig(); return; }
+  const apiKey = localStorage.getItem('cfg_api_key');
+  const clientId = localStorage.getItem('cfg_src_client_id_fixed');
+  
+  if (!apiKey || !clientId) {
+    showToast('⚙設定を開き、APIキーとクライアントIDを登録してください');
+    toggleConfig();
+    return;
+  }
   
   try {
+    // 1. 認証を確実に通す（ここでポップアップが開く、または裏でトークン取得）
     await getAccessToken();
     showToast('Googleカレンダーから情報を同期中...');
     
-    // カレンダー名（「2フライト」など）が入っている場合は、まずそのカレンダーのIDを探す
     let srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
     if (srcCalId !== 'primary' && !srcCalId.includes('@')) {
       const listRes = await gapi.client.calendar.calendarList.list();
@@ -301,13 +336,13 @@ async function fetchFlightEvents() {
     render();
     showToast(`同期完了: フライトを ${EVENTS.length} 件抽出しました`);
   } catch (err) {
-    console.error(err);
+    console.error('Fetch error details:', err);
     showToast('データの取得に失敗しました。設定や権限を確認してください');
   }
 }
 
 /* ══════════════════════════════════════
-   フライトログ専用 パースロジック
+   フライトログ パースロジック
 ══════════════════════════════════════ */
 const FL_RE = /^(\d{1,4})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(FO|DEADHEAD|OBS)/;
 const DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+(\d+)\s+(\w+)\s+(\d{4})/i;
@@ -368,7 +403,7 @@ function toLocalDateStr(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+t
    UI レンダリング
 ══════════════════════════════════════ */
 let currentTab='all';
-function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.add('active'); render(); }
+function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); render(); }
 
 function buildCard(ev){
   const flights=parseFlights(ev.desc);
@@ -464,8 +499,13 @@ function updateBulkBar(){ const bar = document.getElementById('bulk-bar'); docum
 function clearSelection(){ selectedIds.forEach(id => { const c = document.getElementById(`chk_${id}`); if(c) c.checked = false; }); selectedIds.clear(); updateBulkBar(); }
 
 async function execBulkRegister(){
-  if (!gapiInited) return;
   showToast('カレンダーへ一括登録中...');
+  try {
+    await getAccessToken();
+  } catch(e) {
+    showToast('認証エラーにより登録できませんでした');
+    return;
+  }
   
   for (const evId of selectedIds) {
     const card = document.getElementById(`card_${evId}`); if(!card) continue;
