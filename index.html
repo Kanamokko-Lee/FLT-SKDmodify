@@ -8,119 +8,86 @@
 <meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#0a0e1a">
 <title>追検アラート</title>
-
 <style>
 :root {
-  --bg:       #0a0e1a;
-  --bg2:      #111827;
-  --bg3:      #1a2235;
-  --border:   rgba(255,255,255,0.07);
-  --border2:  rgba(255,255,255,0.13);
-  --text:     #e8edf5;
-  --text2:    #8a9bb5;
-  --text3:    #4a5a72;
-  --blue:     #4a9eff;
-  --blue-dim: rgba(74,158,255,0.12);
-  --green:    #34c78a;
-  --green-dim:rgba(52,199,138,0.12);
-  --amber:    #f5a623;
-  --amber-dim:rgba(245,166,35,0.12);
-  --red:      #ff6b6b;
-  --radius:   14px;
-  --radius-sm:8px;
+  --bg:#0a0e1a; --bg2:#111827; --bg3:#1a2235;
+  --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+  --text:#e8edf5; --text2:#8a9bb5; --text3:#4a5a72;
+  --blue:#4a9eff; --blue-dim:rgba(74,158,255,0.12);
+  --green:#34c78a; --green-dim:rgba(52,199,138,0.12);
+  --amber:#f5a623; --amber-dim:rgba(245,166,35,0.12);
+  --radius:14px; --radius-sm:8px;
 }
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo UI', system-ui, sans-serif;
-  background: var(--bg); color: var(--text); min-height: 100vh;
-}
-
-/* ── Header ── */
-.app-header {
-  position: sticky; top: 0; z-index: 100;
-  background: rgba(10,14,26,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-}
-.header-inner { display: flex; align-items: center; gap: 12px; padding: 14px 20px; }
-.header-icon { width: 36px; height: 36px; background: var(--blue-dim); border: 1px solid rgba(74,158,255,0.25); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.header-text { flex: 1; }
-.header-title { font-size: 17px; font-weight: 700; }
-.header-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
-
-.btn-group { display: flex; gap: 6px; }
-button.header-btn { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); padding: 7px 12px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-
-/* ── 設定パネル ── */
-.config-panel { background: var(--bg2); border: 1px solid var(--border2); padding: 16px; margin: 12px 16px; border-radius: var(--radius); display: none; }
-.config-panel.show { display: block; }
-.config-title { font-size: 13px; font-weight: bold; margin-bottom: 12px; color: var(--blue); }
-.config-field { margin-bottom: 10px; }
-.config-field label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 4px; }
-.config-field input { width: 100%; background: var(--bg3); border: 1px solid var(--border2); padding: 8px; border-radius: 6px; color: var(--text); font-size: 13px; outline: none; }
-
-/* ── 操作セクション ── */
-.action-section { padding: 16px 16px 4px; max-width: 640px; margin: 0 auto; }
-.sync-btn { width: 100%; background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(74,158,255,0.4); padding: 12px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
-.sync-btn:active { opacity: 0.8; }
-
-/* ── Tabs ── */
-.tabs-wrap { display: flex; gap: 6px; padding: 10px 20px; overflow-x: auto; }
-.tab { padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text2); background: transparent; border: 1px solid var(--border); border-radius: 100px; cursor: pointer; white-space: nowrap; }
-.tab.active { color: var(--bg); background: var(--text); border-color: var(--text); }
-main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
-
-/* ── カード・タイムライン表示群 ── */
-.ev-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
-.ev-card.has-alert { border-color: rgba(74,158,255,0.2); }
-.ev-header { display: flex; align-items: center; gap: 10px; padding: 13px 16px; cursor: pointer; }
-.badge { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 100px; }
-.b-stay  { background: var(--green-dim); color: var(--green); border: 1px solid rgba(52,199,138,0.25); }
-.b-fly   { background: var(--blue-dim);  color: var(--blue);  border: 1px solid rgba(74,158,255,0.25); }
-.b-other { background: var(--bg3);       color: var(--text2); border: 1px solid var(--border); }
-.ev-name { font-size: 13px; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ev-date-left { font-size: 20px; font-weight: 700; color: var(--text); font-family: 'Courier New', monospace; }
-.chev { font-size: 14px; color: var(--text3); transition: transform .2s; }
-.chev.open { transform: rotate(180deg); }
-.ev-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
-.ev-body.open { display: block; }
-.sec-lbl { font-size: 10px; font-weight: 700; color: var(--text3); text-transform: uppercase; margin: 12px 0 8px; }
-.timeline { padding-left: 20px; position: relative; }
-.timeline::before { content: ''; position: absolute; left: 6px; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
-.tl-item { position: relative; margin-bottom: 9px; font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 4px; }
-.tl-item::before { content: ''; position: absolute; left: -15px; top: 5px; width: 6px; height: 6px; border-radius: 50%; background: var(--border2); }
-.tl-item.fl::before { background: var(--blue); }
-.tl-item.stay-item::before { background: var(--green); }
-.tl-time { font-family: 'Courier New', monospace; font-size: 11px; color: var(--text); font-weight: 600; }
-.role-tag { font-size: 10px; padding: 1px 5px; border-radius: 4px; font-weight: 700; }
-.role-fo  { background: rgba(74,158,255,.15);  color: var(--blue); }
-.role-dh  { background: rgba(138,155,181,.12); color: var(--text2); }
-
-.dep-box { background: var(--green-dim); border: 1px solid rgba(52,199,138,0.2); border-radius: var(--radius-sm); padding: 11px 14px; margin-top: 10px; }
-.dep-box-label { font-size: 10px; color: var(--green); font-weight: 700; margin-bottom: 4px; }
-.dep-flight { font-size: 15px; font-weight: 700; color: var(--text); font-family: 'Courier New', monospace; }
-
-.alert-box { background: rgba(10,14,26,0.6); border: 1px solid rgba(74,158,255,0.2); border-radius: var(--radius-sm); padding: 11px 14px; margin-top: 8px; }
-.alert-box-title { font-size: 10px; font-weight: 700; color: var(--blue); margin-bottom: 8px; }
-.alert-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-.alert-row:last-child { border-bottom: none; }
-.alert-lbl { color: var(--text2); }
-.alert-val { font-family: 'Courier New', monospace; font-size: 11px; color: var(--text); font-weight: 600; text-align: right; }
-.summary-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0 2px; }
-.summary-label { font-size: 10px; font-weight: 700; color: var(--text2); }
-.summary-value { font-size: 14px; font-weight: 700; color: var(--amber); font-family: 'Courier New', monospace; }
-
-.reg-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 10px; padding: 11px 16px; font-size: 13px; font-weight: 700; color: var(--blue); background: var(--blue-dim); border: 1px solid rgba(74,158,255,0.3); border-radius: var(--radius-sm); cursor: pointer; }
-.reg-btn.done { color: var(--green); background: var(--green-dim); border-color: rgba(52,199,138,0.3); }
-
-#toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e2d45; color: var(--text); font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 100px; border: 1px solid rgba(74,158,255,0.3); z-index: 9999; opacity: 0; pointer-events: none; transition: opacity .3s; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,.5); }
-#toast.show { opacity: 1; }
-
-.card-checkbox { width: 20px; height: 20px; accent-color: var(--blue); cursor: pointer; }
-#bulk-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 100px; padding: 10px 16px; box-shadow: 0 8px 32px rgba(0,0,0,.6); z-index: 200; }
-#bulk-bar.show { display: flex; }
-#bulk-bar-btn { padding: 8px 18px; font-size: 13px; font-weight: 700; color: var(--bg); background: linear-gradient(135deg, var(--blue), var(--green)); border: none; border-radius: 100px; cursor: pointer; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Hiragino Sans','Yu Gothic UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.app-header{position:sticky;top:0;z-index:100;background:rgba(10,14,26,0.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.header-inner{display:flex;align-items:center;gap:12px;padding:14px 20px}
+.header-icon{width:36px;height:36px;background:var(--blue-dim);border:1px solid rgba(74,158,255,0.25);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.header-text{flex:1}
+.header-title{font-size:17px;font-weight:700}
+.header-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.header-btn{background:var(--bg3);color:var(--text);border:1px solid var(--border2);padding:7px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer}
+.config-panel{background:var(--bg2);border:1px solid var(--border2);padding:16px;margin:12px 16px;border-radius:var(--radius);display:none}
+.config-panel.show{display:block}
+.config-title{font-size:13px;font-weight:bold;margin-bottom:12px;color:var(--blue)}
+.config-field{margin-bottom:10px}
+.config-field label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px}
+.config-field input{width:100%;background:var(--bg3);border:1px solid var(--border2);padding:8px;border-radius:6px;color:var(--text);font-size:13px;outline:none}
+.tabs-wrap{display:flex;gap:6px;padding:10px 20px;overflow-x:auto}
+.tab{padding:6px 14px;font-size:12px;font-weight:600;color:var(--text2);background:transparent;border:1px solid var(--border);border-radius:100px;cursor:pointer;white-space:nowrap}
+.tab.active{color:var(--bg);background:var(--text);border-color:var(--text)}
+.action-section{padding:12px 16px 4px;max-width:640px;margin:0 auto}
+.sync-btn{width:100%;background:var(--blue-dim);color:var(--blue);border:1px solid rgba(74,158,255,0.4);padding:12px;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
+.ev-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:10px;overflow:hidden}
+.ev-card.has-alert{border-color:rgba(74,158,255,0.2)}
+.ev-header{display:flex;align-items:center;gap:10px;padding:13px 16px}
+.badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;flex-shrink:0}
+.b-stay{background:var(--green-dim);color:var(--green);border:1px solid rgba(52,199,138,0.25)}
+.b-fly{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(74,158,255,0.25)}
+.b-other{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.ev-date-left{font-size:20px;font-weight:700;color:var(--text);font-family:'Courier New',monospace;flex-shrink:0}
+.ev-name{font-size:13px;font-weight:600;flex:none;text-align:right;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chev{font-size:14px;color:var(--text3);transition:transform .2s;flex-shrink:0}
+.chev.open{transform:rotate(180deg)}
+.ev-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border)}
+.ev-body.open{display:block}
+.sec-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin:12px 0 8px}
+.timeline{padding-left:20px;position:relative}
+.timeline::before{content:'';position:absolute;left:6px;top:4px;bottom:4px;width:1px;background:var(--border)}
+.tl-item{position:relative;margin-bottom:9px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.tl-item::before{content:'';position:absolute;left:-15px;top:5px;width:6px;height:6px;border-radius:50%;background:var(--border2)}
+.tl-item.fl::before{background:var(--blue)}
+.tl-item.stay-item::before{background:var(--green)}
+.tl-time{font-family:'Courier New',monospace;font-size:11px;color:var(--text);font-weight:600}
+.role-tag{font-size:10px;padding:1px 5px;border-radius:4px;font-weight:700}
+.role-fo{background:rgba(74,158,255,.15);color:var(--blue)}
+.role-dh{background:rgba(138,155,181,.12);color:var(--text2)}
+.after-stay-tag{font-size:10px;font-weight:700;background:rgba(245,166,35,0.15);color:var(--amber);border:1px solid rgba(245,166,35,0.25);padding:1px 6px;border-radius:100px}
+.dep-box{background:var(--green-dim);border:1px solid rgba(52,199,138,0.2);border-radius:var(--radius-sm);padding:11px 14px;margin-top:10px}
+.dep-box-label{font-size:10px;color:var(--green);font-weight:700;margin-bottom:4px}
+.dep-flight{font-size:15px;font-weight:700;color:var(--text);font-family:'Courier New',monospace}
+.dep-sub{font-size:11px;color:rgba(52,199,138,.7);margin-top:2px}
+.alert-box{background:rgba(10,14,26,0.6);border:1px solid rgba(74,158,255,0.2);border-radius:var(--radius-sm);padding:11px 14px;margin-top:8px}
+.alert-box-title{font-size:10px;font-weight:700;color:var(--blue);margin-bottom:8px}
+.alert-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px}
+.alert-row:last-child{border-bottom:none}
+.alert-lbl{color:var(--text2)}
+.alert-val{font-family:'Courier New',monospace;font-size:11px;color:var(--text);font-weight:600;text-align:right}
+.summary-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0 2px}
+.summary-label{font-size:10px;font-weight:700;color:var(--text2)}
+.summary-value{font-size:14px;font-weight:700;color:var(--amber);font-family:'Courier New',monospace;letter-spacing:1px}
+.reg-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:11px 16px;font-size:13px;font-weight:700;color:var(--blue);background:var(--blue-dim);border:1px solid rgba(74,158,255,0.3);border-radius:var(--radius-sm);cursor:pointer;transition:all .2s}
+.reg-btn.done{color:var(--green);background:var(--green-dim);border-color:rgba(52,199,138,0.3)}
+.card-checkbox{width:20px;height:20px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
+#bulk-bar{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border2);border-radius:100px;padding:10px 16px 10px 20px;box-shadow:0 8px 32px rgba(0,0,0,.6);z-index:200;white-space:nowrap}
+#bulk-bar.show{display:flex}
+#bulk-bar-count{font-size:13px;font-weight:700;color:var(--text2)}
+#bulk-bar-btn{padding:8px 18px;font-size:13px;font-weight:700;color:var(--bg);background:linear-gradient(135deg,var(--blue),var(--green));border:none;border-radius:100px;cursor:pointer}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e2d45;color:var(--text);font-size:13px;font-weight:600;padding:10px 20px;border-radius:100px;border:1px solid rgba(74,158,255,0.3);z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap;max-width:calc(100vw - 40px);overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+#toast.show{opacity:1}
+.empty{text-align:center;color:var(--text2);font-size:14px;padding:3rem 1rem}
 </style>
-
 </head>
 <body>
 
@@ -129,11 +96,9 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
     <div class="header-icon">✈</div>
     <div class="header-text">
       <div class="header-title">追検アラート</div>
-      <div class="header-sub">自動フライト情報同期</div>
+      <div class="header-sub" id="auth-status">設定してください</div>
     </div>
-    <div class="btn-group">
-      <button class="header-btn" onclick="toggleConfig()">⚙ 設定</button>
-    </div>
+    <button class="header-btn" onclick="toggleConfig()">⚙ 設定</button>
   </div>
   <div class="tabs-wrap">
     <button class="tab active" onclick="setTab('all',this)">すべて</button>
@@ -143,388 +108,453 @@ main { padding: 12px 16px 100px; max-width: 640px; margin: 0 auto; }
 </header>
 
 <div id="config-panel" class="config-panel">
-  <div class="config-title">Google API 連携設定</div>
+  <div class="config-title">⚙ Google API 設定</div>
   <div class="config-field">
     <label>Google API Key</label>
     <input type="password" id="cfg-api-key" placeholder="AIzaSy...">
   </div>
   <div class="config-field">
     <label>OAuth クライアント ID</label>
-    <input type="text" id="cfg-client-id" placeholder="xxxx-xxxx.apps.googleusercontent.com">
+    <input type="text" id="cfg-client-id" placeholder="xxxx.apps.googleusercontent.com">
   </div>
   <div class="config-field">
-    <label>読み込み元フライトカレンダー名 / ID (空欄ならメイン)</label>
-    <input type="text" id="cfg-src-cal-id" placeholder="primary">
+    <label>フライトカレンダー名（例：2フライト）</label>
+    <input type="text" id="cfg-src-cal" placeholder="2フライト">
   </div>
-  <button class="header-btn" style="width:100%; justify-content:center; background:var(--blue); color:#000; margin-top:8px;" onclick="saveConfig()">設定を保存</button>
+  <button onclick="saveConfig()" style="width:100%;padding:10px;background:var(--blue);color:#000;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:700;cursor:pointer;margin-top:4px">保存</button>
 </div>
 
 <div class="action-section">
-  <button class="sync-btn" onclick="fetchFlightEvents()">🔄 Googleカレンダーからフライト情報を自動取得</button>
+  <button class="sync-btn" onclick="startSync()">🔄 Googleカレンダーからフライト情報を自動取得</button>
 </div>
 
-<main>
-  <div id="container"></div>
-</main>
+<main><div id="container"><div class="empty">「自動取得」ボタンを押してください</div></div></main>
 
 <div id="toast"></div>
 <div id="bulk-bar">
   <span id="bulk-bar-count">0件選択中</span>
   <button id="bulk-bar-btn" onclick="execBulkRegister()">⚡ 一括登録</button>
-  <span style="cursor:pointer; color:var(--text3); padding:0 4px;" onclick="clearSelection()">✕</span>
+  <span style="cursor:pointer;color:var(--text3);padding:0 6px;font-size:18px" onclick="clearSelection()">✕</span>
 </div>
 
 <script>
-let tokenClient = null;
+/* ══ カレンダーID ══ */
+const TARGET_CAL_ID = "89fihd656vdmnlgisqape2l4no@group.calendar.google.com"; // 0予定
+const IDO_CAL_ID    = "ksjofkag773varmi7j1afj23k0@group.calendar.google.com";  // 3移動
 
-function onGapiLoad() {
-  const apiKey = localStorage.getItem('cfg_api_key');
-  gapi.load('client', async () => {
-    try {
-      await gapi.client.init({ apiKey: apiKey, discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"] });
-      console.log('GAPI init success');
-    } catch(e) { console.error('GAPI init error:', e); }
-  });
-}
-
-function onGisLoad() {
-  // すべてのキー名を「cfg_src_client_id_fixed」に完全統合
-  const clientId = localStorage.getItem('cfg_src_client_id_fixed');
-  if (clientId && window.google) {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/calendar.events',
-      callback: '', 
-    });
-    console.log('GIS init success');
-  }
-}
-</script>
-<script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" async defer></script>
-<script src="https://accounts.google.com/gsi/client" onload="onGisLoad()" async defer></script>
-
-<script>
-/* ══════════════════════════════════════
-   カレンダー 登録先ID一覧
-══════════════════════════════════════ */
-const TARGET_CAL_ID = "89fihd656vdmnlgisqape2l4no@group.calendar.google.com"; // 0予定（追検）
-const IDO_CAL_ID   = "ksjofkag773varmi7j1afj23k0@group.calendar.google.com"; // 3移動
-
-const TZ = { HND:9,NRT:9,ITM:9,KIX:9,FUK:9,OKA:9,CTS:9,LAX:-7,SFO:-7,SEA:-7,JFK:-4,SIN:8,HKG:8,ICN:9,BKK:7,TSA:8,CAN:8,MNL:8,SGN:7 };
+/* ══ タイムゾーン ══ */
+const TZ = {HND:9,NRT:9,ITM:9,KIX:9,FUK:9,OKA:9,CTS:9,NGO:9,SDJ:9,LAX:-7,SFO:-7,SEA:-7,JFK:-4,BOS:-4,MIA:-4,ORD:-5,DFW:-5,DEN:-6,HNL:-10,GUM:10,SIN:8,HKG:8,MNL:8,TSA:8,CAN:8,PEK:8,PVG:8,ICN:9,BKK:7,SGN:7,RGN:6,DXB:4,BOM:5,DEL:5,SYD:11,MEL:11,LHR:1,CDG:2,FRA:2,AMS:2};
 function tzOff(iata){ return TZ[iata] !== undefined ? TZ[iata] : 9; }
 
+/* ══ 状態 ══ */
 let EVENTS = [];
 let selectedIds = new Set();
-let registered = JSON.parse(localStorage.getItem('tsuiken_api_registered') || '{}');
+let registered = {};
+let isGapiReady = false;
+let tokenClient = null;
+let pendingAction = null; // 認証後に実行する処理
 
-function saveStore() { localStorage.setItem('tsuiken_api_registered', JSON.stringify(registered)); }
+/* ══ 設定 ══ */
+function toggleConfig(){ document.getElementById('config-panel').classList.toggle('show'); }
 
 window.addEventListener('load', () => {
-  document.getElementById('cfg-api-key').value = localStorage.getItem('cfg_api_key') || '';
-  document.getElementById('cfg-client-id').value = localStorage.getItem('cfg_src_client_id_fixed') || '';
-  const calId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
-  document.getElementById('cfg-src-cal-id').value = calId === 'primary' ? '' : calId;
+  document.getElementById('cfg-api-key').value  = localStorage.getItem('cfg_api_key')    || '';
+  document.getElementById('cfg-client-id').value = localStorage.getItem('cfg_client_id') || '';
+  document.getElementById('cfg-src-cal').value   = localStorage.getItem('cfg_src_cal')   || '2フライト';
+  updateAuthStatus();
 });
 
-function toggleConfig() { document.getElementById('config-panel').classList.toggle('show'); }
-
-function saveConfig() {
-  let rawClientId = document.getElementById('cfg-client-id').value.trim();
-  rawClientId = rawClientId.replace(/^https?:\/*/, '');
-
-  localStorage.setItem('cfg_api_key', document.getElementById('cfg-api-key').value.trim());
-  localStorage.setItem('cfg_src_client_id_fixed', rawClientId); 
-  localStorage.setItem('cfg_src_cal_id_real', document.getElementById('cfg-src-cal-id').value.trim() || 'primary');
-  
-  showToast('設定を保存しました。画面を一度リロードしてください。');
+function saveConfig(){
+  localStorage.setItem('cfg_api_key',   document.getElementById('cfg-api-key').value.trim());
+  localStorage.setItem('cfg_client_id', document.getElementById('cfg-client-id').value.trim());
+  localStorage.setItem('cfg_src_cal',   document.getElementById('cfg-src-cal').value.trim() || '2フライト');
+  showToast('設定を保存しました');
   toggleConfig();
+  initGapi();
 }
 
-/* ══════════════════════════════════════
-   トークンを確実に取得するプロミス
-══════════════════════════════════════ */
-function getAccessToken() {
-  return new Promise((resolve, reject) => {
-    // 【最重要修正】ここも「cfg_src_client_id_fixed」へ完全に統一！！
-    const clientId = localStorage.getItem('cfg_src_client_id_fixed');
-    if (!clientId) return reject('クライアントIDが設定されていません');
+function updateAuthStatus(){
+  const hasKey = !!localStorage.getItem('cfg_api_key');
+  const hasId  = !!localStorage.getItem('cfg_client_id');
+  document.getElementById('auth-status').textContent =
+    (!hasKey || !hasId) ? '⚙ 設定が必要です' : '設定済み・取得準備OK';
+}
 
-    if (!tokenClient && window.google) {
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: 'https://www.googleapis.com/auth/calendar.events',
-        callback: '',
+/* ══ Google API 初期化 ══ */
+function onGapiLoad(){
+  gapi.load('client', async () => {
+    try {
+      const apiKey = localStorage.getItem('cfg_api_key');
+      if(!apiKey) return;
+      await gapi.client.init({
+        apiKey,
+        discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"]
       });
-    }
-
-    if (!tokenClient) return reject('Google SDKの初期化が完了していません。');
-
-    tokenClient.callback = (resp) => {
-      if (resp.error) {
-        console.error('Auth error callback:', resp);
-        return reject(resp);
-      }
-      resolve(resp);
-    };
-    
-    const currentToken = gapi.client.getToken();
-    if (currentToken === null) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-      tokenClient.requestAccessToken({ prompt: '' });
+      isGapiReady = true;
+      updateAuthStatus();
+    } catch(e){
+      showToast('GAPI初期化エラー: ' + (e.message || JSON.stringify(e)));
     }
   });
 }
 
-/* ══════════════════════════════════════
-   カレンダーから予定を取得
-══════════════════════════════════════ */
-async function fetchFlightEvents() {
-  const apiKey = localStorage.getItem('cfg_api_key');
-  const clientId = localStorage.getItem('cfg_src_client_id_fixed');
-  
-  if (!apiKey || !clientId) {
-    showToast('⚙設定を開き、APIキーとクライアントIDを登録してください');
-    toggleConfig();
-    return;
+function onGisLoad(){ initGis(); }
+
+function initGis(){
+  const clientId = localStorage.getItem('cfg_client_id');
+  if(!clientId || !window.google?.accounts) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: [
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events'
+    ].join(' '),
+    callback: async (resp) => {
+      if(resp.error){ showToast('認証エラー: ' + resp.error); return; }
+      if(pendingAction === 'fetch') await doFetch();
+      else if(pendingAction === 'register') await doRegisterAll();
+      pendingAction = null;
+    }
+  });
+}
+
+function initGapi(){
+  if(window.gapi && !isGapiReady) onGapiLoad();
+  if(window.google?.accounts) initGis();
+}
+
+/* ══ 認証→処理の共通フロー ══ */
+function withAuth(action){
+  if(!localStorage.getItem('cfg_api_key') || !localStorage.getItem('cfg_client_id')){
+    showToast('⚙ 設定を開き、APIキーとクライアントIDを入力してください');
+    toggleConfig(); return;
   }
-  
+  if(!isGapiReady){ showToast('API初期化中です。数秒後に再度お試しください'); return; }
+  if(!tokenClient){ initGis(); if(!tokenClient){ showToast('GIS初期化エラー。設定を確認してください'); return; } }
+
+  pendingAction = action;
+  const token = gapi.client.getToken();
+  tokenClient.requestAccessToken({ prompt: token ? '' : 'consent' });
+}
+
+/* ══ フライトデータ取得 ══ */
+function startSync(){ withAuth('fetch'); }
+
+async function doFetch(){
+  showToast('カレンダーを取得中...');
   try {
-    await getAccessToken();
-    showToast('Googleカレンダーから情報を同期中...');
-    
-    let srcCalId = localStorage.getItem('cfg_src_cal_id_real') || 'primary';
-    if (srcCalId !== 'primary' && !srcCalId.includes('@')) {
-      const listRes = await gapi.client.calendar.calendarList.list();
-      const found = (listRes.result.items || []).find(c => c.summary === srcCalId);
-      if (found) srcCalId = found.id;
+    let calId = localStorage.getItem('cfg_src_cal') || '2フライト';
+
+    // カレンダー名からIDを解決
+    if(!calId.includes('@') && calId !== 'primary'){
+      const res = await gapi.client.calendar.calendarList.list();
+      const found = (res.result.items || []).find(c => c.summary === calId);
+      if(found){ calId = found.id; }
+      else { showToast(`カレンダー「${calId}」が見つかりません`); return; }
     }
 
     const now = new Date();
-    const timeMin = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(); 
-    const timeMax = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString(); 
+    const timeMin = new Date(now.getTime() - 2*24*3600*1000).toISOString();
+    const timeMax = new Date(now.getTime() + 90*24*3600*1000).toISOString();
 
-    const response = await gapi.client.calendar.events.list({
-      calendarId: srcCalId,
-      timeMin: timeMin,
-      timeMax: timeMax,
-      singleEvents: true,
-      orderBy: 'startTime'
+    const res = await gapi.client.calendar.events.list({
+      calendarId: calId, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 100
     });
 
-    const items = response.result.items || [];
-    EVENTS = [];
-
-    items.forEach(item => {
-      const text = (item.summary || '') + '\n' + (item.description || '');
-      if (text.includes('Check-in') || text.includes('Hotel') || text.includes('FO') || text.includes('Pairing id') || text.includes('DEADHEAD')) {
-        EVENTS.push({
-          id: item.id,
-          summary: item.summary || 'フライトスケジュール',
-          start: item.start.dateTime || item.start.date,
-          desc: item.description || ''
-        });
-      }
-    });
+    const items = res.result.items || [];
+    EVENTS = items
+      .filter(item => {
+        const t = (item.summary||'') + (item.description||'');
+        return /Check-in|Hotel|FO|DEADHEAD/i.test(t);
+      })
+      .map(item => ({
+        id: item.id,
+        summary: item.summary || 'フライトスケジュール',
+        start: item.start.dateTime || item.start.date,
+        desc: item.description || ''
+      }));
 
     render();
-    showToast(`同期完了: フライトを ${EVENTS.length} 件抽出しました`);
-  } catch (err) {
-    console.error('Fetch error details:', err);
-    showToast('データの取得に失敗しました。設定や権限を確認してください');
+    showToast(`同期完了：${EVENTS.length}件取得`);
+  } catch(e){
+    const msg = e.result?.error?.message || e.message || JSON.stringify(e);
+    showToast('取得失敗: ' + msg);
+    console.error(e);
   }
 }
 
-/* ══════════════════════════════════════
-   フライトログ パースロジック
-══════════════════════════════════════ */
-const FL_RE = /^(\d{1,4})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(FO|DEADHEAD|OBS)/;
+/* ══ パーサー ══ */
+const FL_RE   = /^(\d{1,4})\s+(\d{2}:\d{2})\s+(\d{2}:\d{2})\s+([A-Z]{3})\s*[-–]\s*([A-Z]{3})\s+(FO|DEADHEAD|OBS)/;
 const DATE_RE = /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun),\s+(\d+)\s+(\w+)\s+(\d{4})/i;
-const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const MONTHS  = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 
-function parseFlights(desc){
-  const lines = desc.split('\n').map(l=>l.trim()).filter(Boolean);
-  const result = []; let curDate = null;
+function parseFlightsWithDate(desc){
+  const lines=desc.split('\n').map(l=>l.trim()).filter(Boolean);
+  const result=[]; let cur=null;
   for(const l of lines){
-    const dm = l.match(DATE_RE);
-    if(dm){ curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1])); continue; }
-    const m = l.match(FL_RE);
-    if(m && curDate) result.push({num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(curDate.getTime())});
+    const dm=l.match(DATE_RE); if(dm){cur=new Date(Date.UTC(+dm[3],MONTHS[dm[2].toLowerCase()],+dm[1]));continue;}
+    const m=l.match(FL_RE); if(m&&cur) result.push({num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(cur)});
   }
   return result;
 }
 
 function parseStayPairs(desc){
-  const lines = desc.split('\n').map(l=>l.trim()).filter(Boolean);
-  let curDate = null; const tagged = [];
+  const lines=desc.split('\n').map(l=>l.trim()).filter(Boolean);
+  let cur=null; const tagged=[];
   for(const l of lines){
-    const dm = l.match(DATE_RE);
-    if(dm){ curDate = new Date(Date.UTC(+dm[3], MONTHS[dm[2].toLowerCase()], +dm[1])); tagged.push({type:'date',date:curDate}); continue; }
-    if(/^Hotel\s/i.test(l)){ tagged.push({type:'hotel'}); continue; }
-    const tm = l.match(/^Transport\s+(\d{2}:\d{2})/i); if(tm){ tagged.push({type:'transport', time:tm[1], date:new Date(curDate.getTime())}); continue; }
-    const cm = l.match(/^Check-in\s+(\d{2}:\d{2})\s+([A-Z]{3})/i); if(cm){ tagged.push({type:'checkin', time:cm[1], airport:cm[2], date:new Date(curDate.getTime())}); continue; }
-    const m = l.match(FL_RE);
-    if(m && curDate) tagged.push({type:'flight',num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(curDate.getTime())});
+    const dm=l.match(DATE_RE); if(dm){cur=new Date(Date.UTC(+dm[3],MONTHS[dm[2].toLowerCase()],+dm[1]));continue;}
+    if(/^Hotel\s/i.test(l)){tagged.push({type:'hotel'});continue;}
+    const tm=l.match(/^Transport\s+(\d{2}:\d{2})/i); if(tm){tagged.push({type:'transport',time:tm[1],date:cur?new Date(cur):null});continue;}
+    const cm=l.match(/^Check-in\s+(\d{2}:\d{2})\s+([A-Z]{3})/i); if(cm){tagged.push({type:'checkin',time:cm[1],airport:cm[2],date:cur?new Date(cur):null});continue;}
+    const m=l.match(FL_RE); if(m&&cur) tagged.push({type:'flight',num:m[1],dep:m[2],arr:m[3],from:m[4],to:m[5],role:m[6],date:new Date(cur)});
   }
-  const pairs = [];
+  const pairs=[];
   for(let i=0;i<tagged.length;i++){
-    if(tagged[i].type !== 'hotel') continue;
-    let foFlight = null;
-    for(let j=i+1;j<tagged.length;j++){
-      if(tagged[j].type === 'flight'){ if(tagged[j].role === 'DEADHEAD') continue; foFlight = tagged[j]; break; }
-    }
-    if(!foFlight) continue;
-    let pickup = null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type === 'transport'){ pickup = tagged[j]; break; } if(tagged[j].type === 'flight') break; }
-    let showup = null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type === 'checkin'){ showup = tagged[j]; } if(tagged[j].type === 'flight' && tagged[j].num === foFlight.num) break; }
-    pairs.push({...foFlight, pickup, showup});
+    if(tagged[i].type!=='hotel') continue;
+    let fo=null;
+    for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type==='flight'){ if(tagged[j].role==='DEADHEAD') continue; fo=tagged[j]; break; } }
+    if(!fo) continue;
+    let pickup=null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type==='transport'){pickup=tagged[j];break;} if(tagged[j].type==='flight') break; }
+    let showup=null; for(let j=i+1;j<tagged.length;j++){ if(tagged[j].type==='checkin') showup=tagged[j]; if(tagged[j].type==='flight'&&tagged[j].num===fo.num) break; }
+    pairs.push({...fo,pickup,showup});
   }
   return pairs;
 }
 
 function hasHotel(desc){ return /Hotel\s/i.test(desc); }
 
-function calcDepUTC(evStartISO, depHHMM, depAirport, flightDate){
-  const [hh,mm] = depHHMM.split(':').map(Number);
-  if(flightDate){ const t = new Date(flightDate.getTime()); t.setUTCHours(hh, mm, 0, 0); return t; }
-  const base = new Date(evStartISO);
-  for(let d=-1;d<6;d++){ const t = new Date(base); t.setUTCDate(t.getUTCDate()+d); t.setUTCHours(hh, mm, 0, 0); if(t >= base) return t; }
+function calcDepUTC(evStart, hhmm, airport, flightDate){
+  const [hh,mm]=hhmm.split(':').map(Number);
+  if(flightDate){ const t=new Date(flightDate); t.setUTCHours(hh,mm,0,0); return t; }
+  const base=new Date(evStart);
+  for(let d=-1;d<6;d++){ const t=new Date(base); t.setUTCDate(t.getUTCDate()+d); t.setUTCHours(hh,mm,0,0); if(t>=base) return t; }
   return null;
 }
-function toLocalHHMM(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return String(l.getUTCHours()).padStart(2,'0')+String(l.getUTCMinutes()).padStart(2,'0'); }
-function toLocalDateStr(utcDate, tzOffset){ const l=new Date(utcDate.getTime()+tzOffset*3600000); return `${l.getUTCMonth()+1}/${l.getUTCDate()} ${String(l.getUTCHours()).padStart(2,'0')}:${String(l.getUTCMinutes()).padStart(2,'0')}`; }
+function toHHMM(d,off){ const l=new Date(d.getTime()+off*3600000); return String(l.getUTCHours()).padStart(2,'0')+String(l.getUTCMinutes()).padStart(2,'0'); }
+function toDateStr(d,off){ const l=new Date(d.getTime()+off*3600000); return `${l.getUTCMonth()+1}/${l.getUTCDate()} ${String(l.getUTCHours()).padStart(2,'0')}:${String(l.getUTCMinutes()).padStart(2,'0')}`; }
+function toISO(d){ return d.toISOString().replace(/[-:]/g,'').split('.')[0]+'Z'; }
 
-/* ── UI ── */
-let currentTab='all';
-function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); render(); }
+/* ══ カード描画 ══ */
+function findHotelInsertIdx(desc, flights){
+  const lines=desc.split('\n').map(l=>l.trim()).filter(Boolean);
+  const seq=[]; let fi=0;
+  for(const l of lines){
+    if(l.match(DATE_RE)) continue;
+    if(/^Hotel\s/i.test(l)){seq.push({type:'hotel'});continue;}
+    if(l.match(FL_RE)){seq.push({type:'flight',idx:fi});fi++;}
+  }
+  const ins=new Set();
+  for(let i=0;i<seq.length;i++){
+    if(seq[i].type!=='hotel') continue;
+    for(let j=i+1;j<seq.length;j++){ if(seq[j].type==='flight'){ins.add(seq[j].idx);break;} }
+  }
+  return ins;
+}
 
 function buildCard(ev){
-  const flights=parseFlights(ev.desc);
+  const flights=parseFlightsWithDate(ev.desc);
   const pairs=parseStayPairs(ev.desc);
   const isPairs=pairs.length>0;
-
+  const stayNums=new Set(pairs.map(p=>p.num));
   const badgeCls=isPairs?'b-stay':(flights.length?'b-fly':'b-other');
   const badgeTxt=isPairs?'STAY':'FLY';
-  const dateLabel=`${new Date(ev.start).getUTCMonth()+1}/${new Date(ev.start).getUTCDate()}`;
+  const startD=new Date(ev.start);
+  const dateLabel=`${startD.getUTCMonth()+1}/${startD.getUTCDate()}`;
 
-  let tlHTML = '';
-  flights.forEach((f) => {
-    tlHTML += `<div class="tl-item fl"><span class="tl-time">${f.dep}–${f.arr}</span><span style="color:var(--text)">JL${f.num}</span> <span style="font-size:11px;color:var(--text2)">${f.from}→${f.to}</span> <span class="role-tag ${f.role==='FO'?'role-fo':'role-dh'}">${f.role}</span></div>`;
+  const hotelIns=findHotelInsertIdx(ev.desc,flights);
+  let tlHTML='';
+  flights.forEach((f,idx)=>{
+    if(hotelIns.has(idx)) tlHTML+=`<div class="tl-item stay-item"><span>🛏 ホテルステイ</span></div>`;
+    const after=hotelIns.has(idx)&&stayNums.has(f.num);
+    tlHTML+=`<div class="tl-item fl">
+      <span class="tl-time">${f.dep}–${f.arr}</span>
+      <span style="color:var(--text)">JL${f.num}</span>
+      <span style="font-size:11px;color:var(--text2)">${f.from}→${f.to}</span>
+      <span class="role-tag ${f.role==='FO'?'role-fo':'role-dh'}">${f.role}</span>
+      ${after?'<span class="after-stay-tag">★ステイ後</span>':''}
+    </div>`;
   });
 
   const alertHTML=pairs.map(p=>{
-    const depUTC=calcDepUTC(ev.start, p.dep, p.from, p.date); if(!depUTC) return '';
-    const off=tzOff(p.from); const a18=new Date(depUTC.getTime()-18*3600000); const a8=new Date(depUTC.getTime()-8*3600000);
-    const sL=toLocalHHMM(a18,off); const eL=toLocalHHMM(a8,off);
-    const summary=`追検 ${sL}L-${eL}L`; const key=`${ev.id}_${p.num}`; const done=!!registered[key];
+    const depUTC=calcDepUTC(ev.start,p.dep,p.from,p.date); if(!depUTC) return '';
+    const off=tzOff(p.from);
+    const a18=new Date(depUTC.getTime()-18*3600000);
+    const a8 =new Date(depUTC.getTime()-8 *3600000);
+    const sL=toHHMM(a18,off), eL=toHHMM(a8,off);
+    const tsuikenSummary=`追検 ${sL}L-${eL}L`;
+    const key=`${ev.id}_${p.num}`, done=!!registered[key];
 
-    let pickupLocal = null, showupLocal = null, idoSummary = null;
-    if(p.pickup?.time){ const pt = calcDepUTC(ev.start, p.pickup.time, p.from, p.pickup.date); if(pt) pickupLocal = toLocalHHMM(pt, off); }
-    if(p.showup?.time){ const st = calcDepUTC(ev.start, p.showup.time, p.showup.airport||p.from, p.showup.date); if(st) showupLocal = toLocalHHMM(st, tzOff(p.showup.airport||p.from)); }
-    if(pickupLocal || showupLocal) idoSummary = [pickupLocal?`P${pickupLocal}`:'', showupLocal?`S${showupLocal}`:''].filter(Boolean).join(' ');
-    const idoKey = `${ev.id}_ido_${p.num}`; const idoDone = !!registered[idoKey];
+    let pickupL=null, showupL=null, idoSummary=null;
+    if(p.pickup?.time){ const pt=calcDepUTC(ev.start,p.pickup.time,p.from,p.pickup.date); if(pt) pickupL=toHHMM(pt,off); }
+    if(p.showup?.time){ const so=tzOff(p.showup.airport||p.from); const st=calcDepUTC(ev.start,p.showup.time,p.showup.airport||p.from,p.showup.date); if(st) showupL=toHHMM(st,so); }
+    if(pickupL||showupL) idoSummary=[pickupL?`P${pickupL}L`:'',showupL?`S${showupL}L`:''].filter(Boolean).join(' ');
+    const idoKey=`${ev.id}_ido_${p.num}`, idoDone=!!registered[idoKey];
 
     return `
-    <div class="dep-box"><div class="dep-box-label">▶ ステイ後の便</div><div class="dep-flight">JL${p.num} ${p.from} → ${p.to}</div></div>
+    <div class="dep-box">
+      <div class="dep-box-label">▶ ステイ後の便</div>
+      <div class="dep-flight">JL${p.num} ${p.from} → ${p.to}</div>
+      <div class="dep-sub">出発 ${p.dep} UTC（${p.from} / UTC${off>=0?'+':''}${off}）</div>
+    </div>
     <div class="alert-box">
       <div class="alert-box-title">⏰ 追検時間帯</div>
-      <div class="alert-row"><span class="alert-lbl">18h前（開始）</span><span class="alert-val">${toLocalDateStr(a18,off)} L</span></div>
-      <div class="alert-row"><span class="alert-lbl">8h前（終了）</span><span class="alert-val">${toLocalDateStr(a8,off)} L</span></div>
-      <div class="summary-row"><span class="summary-label">件名</span><span class="summary-value">${summary}</span></div>
+      <div class="alert-row"><span class="alert-lbl">18h前（開始）</span><span class="alert-val">${toDateStr(a18,off)} L<br>${a18.toISOString().slice(5,16).replace('T',' ')} UTC</span></div>
+      <div class="alert-row"><span class="alert-lbl">8h前（終了）</span><span class="alert-val">${toDateStr(a8,off)} L<br>${a8.toISOString().slice(5,16).replace('T',' ')} UTC</span></div>
+      <div class="summary-row"><span class="summary-label">件名</span><span class="summary-value">${tsuikenSummary}</span></div>
     </div>
-    <button class="reg-btn${done?' done':''}" id="btn_${key}">${done?`✓ 登録済み`:summary}</button>
-    ${idoSummary ? `<div class="alert-box" style="border-color:rgba(245,166,35,0.25)"><div class="summary-row"><span class="summary-label" style="color:var(--amber)">🚗 移動件名</span><span class="summary-value" style="color:var(--amber)">${idoSummary}</span></div></div><button class="reg-btn${idoDone?' done':''}" id="btn_${idoKey}" style="${idoDone?'':'color:var(--amber);background:rgba(245,166,35,0.12);border-color:rgba(245,166,35,0.3)'}">${idoDone?`✓ 移動登録済み`:idoSummary}</button>` : ''}
-    `;
+    <button class="reg-btn${done?' done':''}" id="btn_${key}" onclick="regSingle('${key}','${ev.id}','${p.num}','${p.from}','${ev.start}','${p.dep}','${p.date?p.date.toISOString():''}')">
+      ${done?`✓ 登録済み`:`📅 追検を登録`}
+    </button>
+    ${idoSummary?`
+    <div class="alert-box" style="border-color:rgba(245,166,35,0.25);margin-top:8px">
+      <div class="alert-box-title" style="color:var(--amber)">🚗 移動情報</div>
+      <div class="summary-row"><span class="summary-label">件名</span><span class="summary-value" style="color:var(--amber)">${idoSummary}</span></div>
+    </div>
+    <button class="reg-btn${idoDone?' done':''}" id="btn_${idoKey}" style="${idoDone?'':'color:var(--amber);background:rgba(245,166,35,0.12);border-color:rgba(245,166,35,0.3)'}"
+      onclick="regIdoSingle('${idoKey}','${ev.id}','${p.num}','${p.from}','${p.showup?.airport||p.from}','${ev.start}','${p.dep}','${p.date?p.date.toISOString():''}','${p.pickup?.time||''}','${p.pickup?.date?p.pickup.date.toISOString():''}','${p.showup?.time||''}','${p.showup?.date?p.showup.date.toISOString():''}')">
+      ${idoDone?`✓ 移動登録済み`:`🚗 移動を登録`}
+    </button>`:''}`;
   }).join('');
 
-  const bulkData = pairs.map(p => {
-    const depUTC = calcDepUTC(ev.start, p.dep, p.from, p.date); if(!depUTC) return null;
-    const off = tzOff(p.from); const a18 = new Date(depUTC.getTime()-18*3600000); const a8 = new Date(depUTC.getTime()-8*3600000);
-    const summary = `追検 ${toLocalHHMM(a18,off)}L-${toLocalHHMM(a8,off)}L`;
-    
-    let idoSummary = null;
-    if(p.pickup?.time || p.showup?.time) {
-      let pL = p.pickup?.time ? toLocalHHMM(calcDepUTC(ev.start, p.pickup.time, p.from, p.pickup.date), off) : '';
-      let sL = p.showup?.time ? toLocalHHMM(calcDepUTC(ev.start, p.showup.time, p.showup.airport||p.from, p.showup.date), tzOff(p.showup.airport||p.from)) : '';
-      idoSummary = [pL?`P${pL}L`:'', sL?`S${sL}L`:''].filter(Boolean).join(' ');
-    }
-
+  // 一括登録用データ
+  const bulkData=pairs.map(p=>{
+    const depUTC=calcDepUTC(ev.start,p.dep,p.from,p.date); if(!depUTC) return null;
+    const off=tzOff(p.from);
+    const a18=new Date(depUTC.getTime()-18*3600000), a8=new Date(depUTC.getTime()-8*3600000);
+    let pickupL=null, showupL=null, idoSummary=null;
+    if(p.pickup?.time){ const pt=calcDepUTC(ev.start,p.pickup.time,p.from,p.pickup.date); if(pt) pickupL=toHHMM(pt,off); }
+    if(p.showup?.time){ const so=tzOff(p.showup.airport||p.from); const st=calcDepUTC(ev.start,p.showup.time,p.showup.airport||p.from,p.showup.date); if(st) showupL=toHHMM(st,so); }
+    if(pickupL||showupL) idoSummary=[pickupL?`P${pickupL}L`:'',showupL?`S${showupL}L`:''].filter(Boolean).join(' ');
     return {
-      tsuikenKey: `${ev.id}_${p.num}`, tsuikenSummary: summary, start18: a18.toISOString(), end8: a8.toISOString(),
-      idoKey: `${ev.id}_ido_${p.num}`, idoSummary: idoSummary, depISO: depUTC.toISOString()
+      tsuikenKey:`${ev.id}_${p.num}`, tsuikenSummary:`追検 ${toHHMM(a18,off)}L-${toHHMM(a8,off)}L`,
+      start18:a18.toISOString(), end8:a8.toISOString(),
+      idoKey:`${ev.id}_ido_${p.num}`, idoSummary, depISO:depUTC.toISOString()
     };
   }).filter(Boolean);
 
-  const cardAttr = encodeURIComponent(JSON.stringify(bulkData));
-  const allDone = bulkData.every(d => registered[d.tsuikenKey] && (!d.idoSummary || registered[d.idoKey]));
+  const allDone=bulkData.length>0&&bulkData.every(d=>registered[d.tsuikenKey]&&(!d.idoSummary||registered[d.idoKey]));
+  const cardAttr=encodeURIComponent(JSON.stringify(bulkData));
 
   return `<article class="ev-card${isPairs?' has-alert':''}" id="card_${ev.id}" data-bulk="${cardAttr}">
     <div class="ev-header">
-      ${isPairs && !allDone ? `<input type="checkbox" class="card-checkbox" id="chk_${ev.id}" onchange="onCheckChange(this,'${ev.id}')">` : `<span style="width:20px"></span>`}
-      <span class="ev-date-left" onclick="toggleBody('${ev.id}')">${dateLabel}</span>
-      <span class="badge ${badgeCls}" onclick="toggleBody('${ev.id}')">${badgeTxt}</span>
-      <span class="ev-name" onclick="toggleBody('${ev.id}')">${ev.summary}</span>
-      <span class="chev" id="chev_${ev.id}" onclick="toggleBody('${ev.id}')">▾</span>
+      ${isPairs&&!allDone?`<input type="checkbox" class="card-checkbox" id="chk_${ev.id}" onchange="onCheckChange(this,'${ev.id}')" onclick="event.stopPropagation()">`:`<span style="width:20px;flex-shrink:0"></span>`}
+      <span class="ev-date-left" onclick="toggleBody('${ev.id}')" style="cursor:pointer">${dateLabel}</span>
+      <span class="badge ${badgeCls}" onclick="toggleBody('${ev.id}')" style="cursor:pointer">${badgeTxt}</span>
+      <span style="flex:1" onclick="toggleBody('${ev.id}')"></span>
+      <span class="ev-name" onclick="toggleBody('${ev.id}')" style="cursor:pointer">${ev.summary}</span>
+      <span class="chev" id="chev_${ev.id}" onclick="toggleBody('${ev.id}')" style="cursor:pointer">▾</span>
     </div>
     <div class="ev-body" id="body_${ev.id}">
-      <div class="sec-lbl">フライト</div><div class="timeline">${tlHTML}</div>${alertHTML}
+      <div class="sec-lbl">フライト</div>
+      <div class="timeline">${tlHTML}</div>
+      ${alertHTML}
     </div>
   </article>`;
 }
 
-function toggleBody(id) {
-  const b = document.getElementById(`body_${id}`); b.classList.toggle('open');
-  const c = document.getElementById(`chev_${id}`); c.classList.toggle('open');
+function toggleBody(id){
+  document.getElementById(`body_${id}`).classList.toggle('open');
+  document.getElementById(`chev_${id}`).classList.toggle('open');
 }
+
+let currentTab='all';
+function setTab(t,el){ currentTab=t; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); el.classList.add('active'); render(); }
 
 function render(){
-  let evs = EVENTS;
-  if(currentTab==='stay') evs = EVENTS.filter(e=>hasHotel(e.desc));
-  if(currentTab==='alert') evs = EVENTS.filter(e=>parseStayPairs(e.desc).length>0);
-  document.getElementById('container').innerHTML = evs.length ? evs.map(buildCard).join('') : '<div style="text-align:center;padding:40px;color:var(--text3)">フライトデータが同期されるとここにタイムラインと追検情報が展開されます</div>';
+  let evs=EVENTS;
+  if(currentTab==='stay') evs=EVENTS.filter(e=>hasHotel(e.desc));
+  if(currentTab==='alert') evs=EVENTS.filter(e=>parseStayPairs(e.desc).length>0);
+  document.getElementById('container').innerHTML=evs.length?evs.map(buildCard).join(''):'<div class="empty">該当するスケジュールがありません</div>';
 }
 
-/* ══════════════════════════════════════
-   一括自動登録
-══════════════════════════════════════ */
-function onCheckChange(chk, evId){ if(chk.checked) selectedIds.add(evId); else selectedIds.delete(evId); updateBulkBar(); }
-function updateBulkBar(){ const bar = document.getElementById('bulk-bar'); document.getElementById('bulk-bar-count').textContent = `${selectedIds.size}件選択中`; bar.style.display = selectedIds.size > 0 ? 'flex' : 'none'; }
-function clearSelection(){ selectedIds.forEach(id => { const c = document.getElementById(`chk_${id}`); if(c) c.checked = false; }); selectedIds.clear(); updateBulkBar(); }
+/* ══ 個別登録（追検） ══ */
+async function regSingle(key,evId,flNum,depAirport,evStart,depHHMM,flightDateISO){
+  const flightDate=flightDateISO?new Date(flightDateISO):null;
+  const depUTC=calcDepUTC(evStart,depHHMM,depAirport,flightDate); if(!depUTC) return;
+  const off=tzOff(depAirport);
+  const a18=new Date(depUTC.getTime()-18*3600000), a8=new Date(depUTC.getTime()-8*3600000);
+  const summary=`追検 ${toHHMM(a18,off)}L-${toHHMM(a8,off)}L`;
+  await insertEvent(TARGET_CAL_ID,summary,a18.toISOString(),a8.toISOString());
+  registered[key]=true;
+  const btn=document.getElementById(`btn_${key}`);
+  if(btn){btn.classList.add('done');btn.textContent=`✓ 登録済み`;}
+  showToast(`「${summary}」を登録しました ✓`);
+}
+
+/* ══ 個別登録（移動） ══ */
+async function regIdoSingle(key,evId,flNum,depAirport,showupAirport,evStart,depHHMM,flightDateISO,pickupHHMM,pickupDateISO,showupHHMM,showupDateISO){
+  const flDate=flightDateISO?new Date(flightDateISO):null;
+  const depUTC=calcDepUTC(evStart,depHHMM,depAirport,flDate); if(!depUTC) return;
+  const off=tzOff(depAirport), soOff=tzOff(showupAirport);
+  let pL=null,sL=null;
+  if(pickupHHMM){ const pt=calcDepUTC(evStart,pickupHHMM,depAirport,pickupDateISO?new Date(pickupDateISO):null); if(pt) pL=toHHMM(pt,off); }
+  if(showupHHMM){ const st=calcDepUTC(evStart,showupHHMM,showupAirport,showupDateISO?new Date(showupDateISO):null); if(st) sL=toHHMM(st,soOff); }
+  const summary=[pL?`P${pL}L`:'',sL?`S${sL}L`:''].filter(Boolean).join(' ');
+  if(!summary) return;
+  const endISO=new Date(depUTC.getTime()+3600000).toISOString();
+  await insertEvent(IDO_CAL_ID,summary,depUTC.toISOString(),endISO);
+  registered[key]=true;
+  const btn=document.getElementById(`btn_${key}`);
+  if(btn){btn.classList.add('done');btn.style='';btn.textContent=`✓ 移動登録済み`;}
+  showToast(`「${summary}」を登録しました ✓`);
+}
+
+/* ══ カレンダーAPI挿入 ══ */
+async function insertEvent(calendarId,summary,startISO,endISO){
+  await gapi.client.calendar.events.insert({
+    calendarId,
+    resource:{ summary, start:{dateTime:startISO,timeZone:'UTC'}, end:{dateTime:endISO,timeZone:'UTC'} }
+  });
+}
+
+/* ══ 一括登録 ══ */
+function onCheckChange(chk,evId){ if(chk.checked) selectedIds.add(evId); else selectedIds.delete(evId); updateBulkBar(); }
+function updateBulkBar(){ const bar=document.getElementById('bulk-bar'); document.getElementById('bulk-bar-count').textContent=`${selectedIds.size}件選択中`; selectedIds.size>0?bar.classList.add('show'):bar.classList.remove('show'); }
+function clearSelection(){ selectedIds.forEach(id=>{const c=document.getElementById(`chk_${id}`);if(c)c.checked=false;}); selectedIds.clear(); updateBulkBar(); }
 
 async function execBulkRegister(){
-  showToast('カレンダーへ一括登録中...');
-  try { await getAccessToken(); } catch(e) { showToast('認証エラーにより登録できませんでした'); return; }
-  
-  for (const evId of selectedIds) {
-    const card = document.getElementById(`card_${evId}`); if(!card) continue;
-    const bulkData = JSON.parse(decodeURIComponent(card.dataset.bulk));
-    
-    for (const d of bulkData) {
-      if (!registered[d.tsuikenKey]) {
-        try {
-          await gapi.client.calendar.events.insert({
-            calendarId: TARGET_CAL_ID,
-            resource: { summary: d.tsuikenSummary, start: { dateTime: d.start18 }, end: { dateTime: d.end8 }, description: '追検自動一括登録' }
-          });
-          registered[d.tsuikenKey] = true;
-        } catch(e) { console.error(e); }
-      }
-      if (d.idoSummary && !registered[d.idoKey]) {
-        try {
-          const depDate = new Date(d.depISO);
-          const endIdo = new Date(depDate.getTime() + 60 * 60 * 1000).toISOString();
-          await gapi.client.calendar.events.insert({
-            calendarId: IDO_CAL_ID,
-            resource: { summary: d.idoSummary, start: { dateTime: d.depISO }, end: { dateTime: endIdo }, description: '移動自動一括登録' }
-          });
-          registered[d.idoKey] = true;
-        } catch(e) { console.error(e); }
-      }
+  if(!gapi.client.getToken()){ showToast('再認証が必要です。自動取得ボタンを押してください'); return; }
+  showToast('一括登録中...');
+  let count=0;
+  for(const evId of selectedIds){
+    const card=document.getElementById(`card_${evId}`); if(!card) continue;
+    const bulkData=JSON.parse(decodeURIComponent(card.dataset.bulk));
+    for(const d of bulkData){
+      try{
+        if(!registered[d.tsuikenKey]){
+          await insertEvent(TARGET_CAL_ID,d.tsuikenSummary,d.start18,d.end8);
+          registered[d.tsuikenKey]=true; count++;
+          const b=document.getElementById(`btn_${d.tsuikenKey}`); if(b){b.classList.add('done');b.textContent='✓ 登録済み';}
+        }
+        if(d.idoSummary&&!registered[d.idoKey]){
+          const endISO=new Date(new Date(d.depISO).getTime()+3600000).toISOString();
+          await insertEvent(IDO_CAL_ID,d.idoSummary,d.depISO,endISO);
+          registered[d.idoKey]=true; count++;
+          const b=document.getElementById(`btn_${d.idoKey}`); if(b){b.classList.add('done');b.style='';b.textContent='✓ 移動登録済み';}
+        }
+      }catch(e){ console.error(e); showToast('一部登録失敗: '+( e.result?.error?.message||e.message)); }
     }
   }
-  saveStore(); render(); clearSelection(); showToast('選択したフライトの追検・移動情報を一括登録しました ✓');
+  clearSelection();
+  showToast(`${count}件をカレンダーに登録しました ✓`);
 }
 
-function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),3000); }
+/* ══ Toast ══ */
+function showToast(msg,dur=3500){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+/* ══ SW削除 ══ */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(r=>r.forEach(s=>s.unregister()));
+  caches.keys().then(keys=>keys.forEach(k=>caches.delete(k)));
+}
 </script>
+
+<!-- Google SDK -->
+<script src="https://apis.google.com/js/api.js" onload="onGapiLoad()" async defer></script>
+<script src="https://accounts.google.com/gsi/client" onload="onGisLoad()" async defer></script>
+
 </body>
 </html>
