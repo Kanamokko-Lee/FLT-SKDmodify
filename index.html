@@ -431,6 +431,14 @@ function initGis(){
   if(saved){
     gapi.client.setToken(saved);
     updateAuthStatus('ログイン済み ✓');
+  } else if(localStorage.getItem('cfg_client_id') && localStorage.getItem('cfg_api_key')){
+    // トークン期限切れの場合、ページロード時にサイレント再認証を試みる
+    setTimeout(() => {
+      if(!loadToken() && tokenClient && isGapiReady){
+        pendingAction = null;
+        tokenClient.requestAccessToken({ prompt: '' });
+      }
+    }, 1500);
   }
 }
 
@@ -458,9 +466,9 @@ async function withAuth(action){
     return;
   }
 
-  // トークンなし or 期限切れ → 認証フロー（初回 or 1時間後のみ）
+  // トークンなし or 期限切れ → 認証フロー（初回のみ表示、以降はサイレント）
   pendingAction = action;
-  tokenClient.requestAccessToken({ prompt: 'select_account' });
+  tokenClient.requestAccessToken({ prompt: '' });
 }
 
 /* ══ フライトデータ取得 ══ */
