@@ -615,57 +615,90 @@ function startMergeHoliday(){ withAuth('mergeholiday'); }
 
 let mergeCandidates = [];
 
+// 「1休日」内の連続終日予定をグループ化して取得（検索のみ、insert/deleteは行わない）
+async function findMergeGroups(){
+  const timeMin = rangeFrom ? rangeFrom.toISOString() : new Date(Date.now()-2*24*3600*1000).toISOString();
+  const timeMax = rangeTo   ? rangeTo.toISOString()   : new Date(Date.now()+90*24*3600*1000).toISOString();
+
+  const res = await gapi.client.calendar.events.list({
+    calendarId: OFF_LEAVE_CAL_ID, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 250
+  });
+
+  const items = (res.result.items || [])
+    .filter(item => !item.start.dateTime && /off|leave|^hh$|vac/i.test(item.summary || ''))
+    .map(item => ({
+      id: item.id,
+      summary: item.summary,
+      start: item.start.date,
+      end: item.end.date,
+      description: item.description || '',
+      location: item.location || ''
+    }))
+    .sort((a,b) => new Date(a.start) - new Date(b.start));
+
+  const groups = [];
+  let current = items.length ? [items[0]] : [];
+  for(let i=1; i<items.length; i++){
+    const prevEnd = current[current.length-1].end;
+    if(items[i].start === prevEnd){
+      current.push(items[i]);
+    } else {
+      groups.push(current);
+      current = [items[i]];
+    }
+  }
+  if(current.length) groups.push(current);
+
+  return groups.filter(g => g.length > 1).map(g => {
+    const summaries = [...new Set(g.map(x => x.summary))];
+    return {
+      ids: g.map(x => x.id),
+      summary: summaries.join(' / '),
+      start: g[0].start,
+      end: g[g.length-1].end,
+      description: g.map(x => x.description).filter(Boolean).join('\n---\n'),
+      location: g[0].location,
+      dayCount: g.length
+    };
+  });
+}
+
+// 統合グループを実際にinsert/deleteする（UIなし、件数を返す）
+async function applyMergeGroups(groups){
+  let success = 0, fail = 0, deletedTotal = 0;
+  for(const g of groups){
+    try {
+      const resource = {
+        summary: g.summary, description: g.description, location: g.location,
+        start: { date: g.start }, end: { date: g.end }
+      };
+      await gapi.client.calendar.events.insert({ calendarId: OFF_LEAVE_CAL_ID, resource });
+      for(const id of g.ids){
+        try { await gapi.client.calendar.events.delete({ calendarId: OFF_LEAVE_CAL_ID, eventId: id }); deletedTotal++; }
+        catch(de){ console.error('delete error', id, de); }
+      }
+      success++;
+    } catch(e){ console.error(e); fail++; }
+  }
+  return { success, fail, deletedTotal };
+}
+
+// 移動完了後に自動で連続統合を実行（サイレント、UI確認なし）
+async function autoMergeAfterMove(){
+  try {
+    const groups = await findMergeGroups();
+    if(groups.length === 0) return { success: 0, fail: 0, deletedTotal: 0 };
+    return await applyMergeGroups(groups);
+  } catch(e){
+    console.error('autoMerge error', e);
+    return { success: 0, fail: 0, deletedTotal: 0 };
+  }
+}
+
 async function doMergeHolidaySearch(){
   showToast('「1休日」内の連続予定を確認中...');
   try {
-    const timeMin = rangeFrom ? rangeFrom.toISOString() : new Date(Date.now()-2*24*3600*1000).toISOString();
-    const timeMax = rangeTo   ? rangeTo.toISOString()   : new Date(Date.now()+90*24*3600*1000).toISOString();
-
-    const res = await gapi.client.calendar.events.list({
-      calendarId: OFF_LEAVE_CAL_ID, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 250
-    });
-
-    // 終日(date形式)のOFF/leave/HH系の予定のみ対象
-    const items = (res.result.items || [])
-      .filter(item => !item.start.dateTime && /off|leave|^hh$|vac/i.test(item.summary || ''))
-      .map(item => ({
-        id: item.id,
-        summary: item.summary,
-        start: item.start.date,
-        end: item.end.date, // 排他的
-        description: item.description || '',
-        location: item.location || ''
-      }))
-      .sort((a,b) => new Date(a.start) - new Date(b.start));
-
-    // 開始日が前の終了日(排他的)と一致 → 連続とみなしてグループ化
-    const groups = [];
-    let current = items.length ? [items[0]] : [];
-    for(let i=1; i<items.length; i++){
-      const prevEnd = current[current.length-1].end; // YYYY-MM-DD（排他的、次の開始日と同じはず）
-      if(items[i].start === prevEnd){
-        current.push(items[i]);
-      } else {
-        groups.push(current);
-        current = [items[i]];
-      }
-    }
-    if(current.length) groups.push(current);
-
-    // 2件以上のグループのみ統合対象として表示
-    mergeCandidates = groups.filter(g => g.length > 1).map(g => {
-      const summaries = [...new Set(g.map(x => x.summary))];
-      return {
-        ids: g.map(x => x.id),
-        summary: summaries.join(' / '),
-        start: g[0].start,
-        end: g[g.length-1].end, // 排他的（最終日の翌日）
-        description: g.map(x => x.description).filter(Boolean).join('\n---\n'),
-        location: g[0].location,
-        dayCount: g.length
-      };
-    });
-
+    mergeCandidates = await findMergeGroups();
     renderMergePanel();
   } catch(e){
     const msg = e.result?.error?.message || e.message || JSON.stringify(e);
@@ -712,30 +745,7 @@ async function confirmMergeHoliday(){
   const btn = document.getElementById('merge-confirm-btn');
   btn.disabled = true; btn.textContent = '統合中...';
 
-  let success = 0, fail = 0, deletedTotal = 0;
-  for(const g of selected){
-    try {
-      const resource = {
-        summary: g.summary,
-        description: g.description,
-        location: g.location,
-        start: { date: g.start },
-        end: { date: g.end }
-      };
-      await gapi.client.calendar.events.insert({ calendarId: OFF_LEAVE_CAL_ID, resource });
-
-      for(const id of g.ids){
-        try {
-          await gapi.client.calendar.events.delete({ calendarId: OFF_LEAVE_CAL_ID, eventId: id });
-          deletedTotal++;
-        } catch(de){ console.error('delete error', id, de); }
-      }
-      success++;
-    } catch(e){
-      console.error(e);
-      fail++;
-    }
-  }
+  const { success, fail, deletedTotal } = await applyMergeGroups(selected);
 
   btn.disabled = false; btn.textContent = 'この内容で統合する';
   closeMergePanel();
@@ -929,7 +939,15 @@ async function confirmOffLeaveMigration(){
 
   btn.disabled = false; btn.textContent = 'この内容で移動する';
   closeOffLeavePanel();
-  showToast(`${success}件（元${deletedTotal}件）を「1休日」へ移動しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
+  showToast(`${success}件（元${deletedTotal}件）を「1休日」へ移動しました ✓ 連続統合を確認中...`);
+
+  // 移動完了後、「1休日」内の連続予定を自動で統合する
+  const mergeResult = await autoMergeAfterMove();
+  if(mergeResult.success > 0){
+    showToast(`さらに${mergeResult.success}件のグループ（元${mergeResult.deletedTotal}件）を自動統合しました ✓`);
+  } else if(fail === 0){
+    showToast(`${success}件を「1休日」へ移動しました ✓`);
+  }
 }
 
 async function doFetch(){
