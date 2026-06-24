@@ -545,13 +545,54 @@ async function doOffLeaveSearch(){
     });
 
     items.sort((a,b) => new Date(a.start) - new Date(b.start));
-    offLeaveCandidates = items;
+
+    // 連続するOFF/leaveをグループ化（前の終了時刻と次の開始時刻が連続している場合まとめる）
+    offLeaveCandidates = groupConsecutiveOffLeave(items);
     renderOffLeavePanel();
   } catch(e){
     const msg = e.result?.error?.message || e.message || JSON.stringify(e);
     showToast('検索失敗: ' + msg);
     console.error(e);
   }
+}
+
+// 隣接するOFF/leave予定をグループ化する
+// 「前の予定の終了UTC」と「次の予定の開始UTC」の差が許容範囲内（同日〜1分程度の隙間）なら連続とみなす
+function groupConsecutiveOffLeave(items){
+  if(items.length === 0) return [];
+  const groups = [];
+  let current = [items[0]];
+
+  for(let i=1; i<items.length; i++){
+    const prevEnd = new Date(current[current.length-1].end);
+    const curStart = new Date(items[i].start);
+    const gapMs = curStart.getTime() - prevEnd.getTime();
+    // 隙間が2時間以内なら連続とみなす（Off終了14:59→翌Off開始15:00のような1分の隙間を吸収）
+    if(gapMs >= 0 && gapMs <= 2*3600000){
+      current.push(items[i]);
+    } else {
+      groups.push(current);
+      current = [items[i]];
+    }
+  }
+  groups.push(current);
+
+  // グループを1件分のオブジェクトに変換
+  return groups.map(group => {
+    const first = group[0], last = group[group.length-1];
+    const summaries = [...new Set(group.map(g => g.summary))];
+    return {
+      ids: group.map(g => g.id),
+      summary: summaries.join(' / '),
+      start: first.start,
+      end: last.end,
+      isAllDay: first.isAllDay,
+      description: group.map(g => g.description).filter(Boolean).join('\n---\n'),
+      location: first.location,
+      sourceCalId: first.sourceCalId,
+      dayCount: group.length
+    };
+  });
 }
 
 function renderOffLeavePanel(){
@@ -562,14 +603,20 @@ function renderOffLeavePanel(){
     document.getElementById('offleave-confirm-btn').disabled = true;
   } else {
     list.innerHTML = offLeaveCandidates.map((ev,i) => {
-      const d = new Date(ev.start);
-      const dateLabel = `${d.getUTCMonth()+1}/${d.getUTCDate()}`;
+      // JST変換した日付範囲を表示用に算出
+      const { startDate, endDate } = toAllDayRange(ev.start, ev.end, ev.isAllDay);
+      const sFmt = startDate.slice(5).replace('-','/');
+      // endDateは排他的なので表示用に1日戻す
+      const endShow = new Date(endDate); endShow.setUTCDate(endShow.getUTCDate()-1);
+      const eFmt = `${endShow.getUTCMonth()+1}/${endShow.getUTCDate()}`;
+      const dateLabel = (ev.dayCount > 1) ? `${sFmt}〜${eFmt}` : sFmt;
       const badge = /leave/i.test(ev.summary) ? 'LEAVE' : 'OFF';
+      const multiTag = ev.dayCount > 1 ? `<span class="offleave-badge" style="background:var(--amber-dim);color:var(--amber);margin-left:4px">${ev.dayCount}連休</span>` : '';
       return `<div class="offleave-item">
         <input type="checkbox" id="ol_${i}" checked>
         <span class="offleave-date">${dateLabel}</span>
         <span class="offleave-title">${ev.summary}</span>
-        <span class="offleave-badge">${badge}</span>
+        <span class="offleave-badge">${badge}</span>${multiTag}
       </div>`;
     }).join('');
     document.getElementById('offleave-confirm-btn').disabled = false;
@@ -590,16 +637,24 @@ function ymd(d){ return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2
 // 既存の開始・終了（all-day or timed）から、終日イベント用の date 文字列範囲を算出
 // Google Calendarの終日イベントの end.date は「排他的」(実際の最終日+1日)
 // 時刻付き(dateTime)の場合は UTC→JST(+9h) 変換した上で日付を確定する
-// (例: UTC 15:00開始 → JST 00:00 = 翌日の00:00 となるため、開始日は+1日)
+// (例: UTC 15:00開始 → JST 翌日00:00 となるため、開始日はUTC日付の+1日)
+// 複数日にまたがるグループの場合、endStrのJST変換結果が実際の最終日を示す
 function toAllDayRange(startStr, endStr, wasAllDay){
   if(wasAllDay){
     return { startDate: startStr.slice(0,10), endDate: endStr.slice(0,10) };
   }
-  const sUTC = new Date(startStr);
-  const sJST = new Date(sUTC.getTime() + 9*3600000); // JSTに変換してから日付を取る
+  const sJST = new Date(new Date(startStr).getTime() + 9*3600000);
+  const eJST = new Date(new Date(endStr).getTime()   + 9*3600000);
+
   const startDate = ymd(sJST);
-  const next = new Date(sJST); next.setUTCDate(next.getUTCDate()+1);
-  const endDate = ymd(next); // 終日イベントは1日分、end.dateは開始日の翌日（排他的）
+
+  // 終了側：UTC 14:59 のようにJST変換すると 23:59 になる（同日扱い）→ +1日して排他的end.dateにする
+  // UTC 15:00以降だとJST翌日00:00になり、すでに次の日扱いなのでそのままend.dateとして使う
+  const eDateOnly = new Date(Date.UTC(eJST.getUTCFullYear(), eJST.getUTCMonth(), eJST.getUTCDate()));
+  const eHasTime = (eJST.getUTCHours() !== 0 || eJST.getUTCMinutes() !== 0);
+  const endBase = eHasTime ? new Date(eDateOnly.getTime() + 24*3600000) : eDateOnly;
+
+  const endDate = ymd(endBase);
   return { startDate, endDate };
 }
 
@@ -695,10 +750,10 @@ async function confirmOffLeaveMigration(){
   const btn = document.getElementById('offleave-confirm-btn');
   btn.disabled = true; btn.textContent = '移動中...';
 
-  let success = 0, fail = 0;
+  let success = 0, fail = 0, deletedTotal = 0;
   for(const ev of selected){
     try {
-      // 1休日カレンダーに新規作成（常に終日イベントとして登録）
+      // 1休日カレンダーに新規作成（常に終日イベントとして登録、複数日連続OFFは1つの期間イベントにまとめる）
       const resource = {
         summary: ev.summary,
         description: ev.description,
@@ -709,8 +764,15 @@ async function confirmOffLeaveMigration(){
       resource.end   = { date: endDate };
 
       await gapi.client.calendar.events.insert({ calendarId: OFF_LEAVE_CAL_ID, resource });
-      // 元のイベントを削除
-      await gapi.client.calendar.events.delete({ calendarId: ev.sourceCalId, eventId: ev.id });
+
+      // グループ内の元イベントを全て削除
+      const idsToDelete = ev.ids || [ev.id];
+      for(const id of idsToDelete){
+        try {
+          await gapi.client.calendar.events.delete({ calendarId: ev.sourceCalId, eventId: id });
+          deletedTotal++;
+        } catch(de){ console.error('delete error', id, de); }
+      }
       success++;
     } catch(e){
       console.error(e);
@@ -720,7 +782,7 @@ async function confirmOffLeaveMigration(){
 
   btn.disabled = false; btn.textContent = 'この内容で移動する';
   closeOffLeavePanel();
-  showToast(`${success}件を「1休日」へ移動しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
+  showToast(`${success}件（元${deletedTotal}件）を「1休日」へ移動しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
 }
 
 async function doFetch(){
