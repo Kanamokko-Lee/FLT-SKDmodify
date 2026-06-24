@@ -121,6 +121,12 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e2d45;color:var(--text);font-size:13px;font-weight:600;padding:10px 20px;border-radius:100px;border:1px solid rgba(74,158,255,0.3);z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap;max-width:calc(100vw - 40px);overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 32px rgba(0,0,0,.5)}
 #toast.show{opacity:1}
 .empty{text-align:center;color:var(--text2);font-size:14px;padding:3rem 1rem}
+.offleave-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px}
+.offleave-item:last-child{border-bottom:none}
+.offleave-item input{width:18px;height:18px;accent-color:var(--green);flex-shrink:0}
+.offleave-date{font-family:'Courier New',monospace;font-weight:700;color:var(--text);min-width:50px}
+.offleave-title{flex:1;color:var(--text2)}
+.offleave-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;background:var(--green-dim);color:var(--green)}
 </style>
 </head>
 <body>
@@ -166,6 +172,19 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
     </div>
   </div>
   <button class="sync-btn" onclick="startSync()">🔄 Googleカレンダーからフライト情報を自動取得</button>
+  <button class="sync-btn" id="offleave-btn" onclick="startOffLeaveMigration()" style="margin-top:8px;background:var(--green-dim);color:var(--green);border-color:rgba(52,199,138,0.4)">
+    🏖 OFF・leave予定を「1休日」へ移動
+  </button>
+</div>
+
+<!-- OFF/leave 移動結果 -->
+<div id="offleave-panel" class="config-panel" style="display:none">
+  <div class="config-title" style="color:var(--green)">🏖 移動対象一覧</div>
+  <div id="offleave-list"></div>
+  <div class="cal-actions" style="margin-top:12px">
+    <button class="cal-btn cal-btn-cancel" onclick="closeOffLeavePanel()">キャンセル</button>
+    <button class="cal-btn cal-btn-ok" id="offleave-confirm-btn" onclick="confirmOffLeaveMigration()">この内容で移動する</button>
+  </div>
 </div>
 
 <!-- カスタム期間カレンダー -->
@@ -201,6 +220,7 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
 /* ══ カレンダーID ══ */
 const TARGET_CAL_ID = "89fihd656vdmnlgisqape2l4no@group.calendar.google.com"; // 0予定
 const IDO_CAL_ID    = "ksjofkag773varmi7j1afj23k0@group.calendar.google.com";  // 3移動
+const OFF_LEAVE_CAL_ID = "0l66ha2u21toujpkaui8tnu0a0@group.calendar.google.com"; // 1休日
 
 /* ══ タイムゾーン ══ */
 const TZ = {HND:9,NRT:9,ITM:9,KIX:9,FUK:9,OKA:9,CTS:9,NGO:9,SDJ:9,LAX:-7,SFO:-7,SEA:-7,JFK:-4,BOS:-4,MIA:-4,ORD:-5,DFW:-5,DEN:-6,HNL:-10,GUM:10,SIN:8,HKG:8,MNL:8,TSA:8,CAN:8,PEK:8,PVG:8,ICN:9,BKK:7,SGN:7,RGN:6,DXB:4,BOM:5,DEL:5,SYD:11,MEL:11,LHR:1,CDG:2,FRA:2,AMS:2};
@@ -422,6 +442,7 @@ function initGis(){
       gapi.client.setToken(resp);
       if(pendingAction === 'fetch') await doFetch();
       else if(pendingAction === 'register') await doRegisterAll();
+      else if(pendingAction === 'offleave') await doOffLeaveSearch();
       pendingAction = null;
     }
   });
@@ -463,6 +484,7 @@ async function withAuth(action){
     pendingAction = null;
     if(action === 'fetch') await doFetch();
     else if(action === 'register') await doRegisterAll();
+    else if(action === 'offleave') await doOffLeaveSearch();
     return;
   }
 
@@ -473,6 +495,127 @@ async function withAuth(action){
 
 /* ══ フライトデータ取得 ══ */
 function startSync(){ withAuth('fetch'); }
+
+/* ══ OFF/leave 振り分け機能 ══ */
+let offLeaveCandidates = [];
+
+function startOffLeaveMigration(){ withAuth('offleave'); }
+
+async function doOffLeaveSearch(){
+  showToast('OFF・leave予定を検索中...');
+  try {
+    let calId = localStorage.getItem('cfg_src_cal') || '2フライト';
+    if(!calId.includes('@') && calId !== 'primary'){
+      const res = await gapi.client.calendar.calendarList.list();
+      const found = (res.result.items || []).find(c => c.summary === calId);
+      if(found) calId = found.id;
+      else { showToast(`カレンダー「${calId}」が見つかりません`); return; }
+    }
+
+    const timeMin = rangeFrom ? rangeFrom.toISOString() : new Date(Date.now()-2*24*3600*1000).toISOString();
+    const timeMax = rangeTo   ? rangeTo.toISOString()   : new Date(Date.now()+90*24*3600*1000).toISOString();
+
+    // OFF と leave を別々に検索（fullTextは複数語のAND検索のため）
+    const [offRes, leaveRes] = await Promise.all([
+      gapi.client.calendar.events.list({ calendarId: calId, timeMin, timeMax, q: 'OFF', singleEvents: true, orderBy: 'startTime', maxResults: 100 }),
+      gapi.client.calendar.events.list({ calendarId: calId, timeMin, timeMax, q: 'leave', singleEvents: true, orderBy: 'startTime', maxResults: 100 })
+    ]);
+
+    const seen = new Set();
+    const items = [];
+    [...(offRes.result.items||[]), ...(leaveRes.result.items||[])].forEach(item => {
+      const title = (item.summary||'');
+      if(/off|leave/i.test(title) && !seen.has(item.id)){
+        seen.add(item.id);
+        items.push({
+          id: item.id, summary: item.summary,
+          start: item.start.dateTime || item.start.date,
+          end: item.end.dateTime || item.end.date,
+          isAllDay: !item.start.dateTime,
+          description: item.description || '',
+          location: item.location || '',
+          sourceCalId: calId
+        });
+      }
+    });
+
+    items.sort((a,b) => new Date(a.start) - new Date(b.start));
+    offLeaveCandidates = items;
+    renderOffLeavePanel();
+  } catch(e){
+    const msg = e.result?.error?.message || e.message || JSON.stringify(e);
+    showToast('検索失敗: ' + msg);
+    console.error(e);
+  }
+}
+
+function renderOffLeavePanel(){
+  const panel = document.getElementById('offleave-panel');
+  const list  = document.getElementById('offleave-list');
+  if(offLeaveCandidates.length === 0){
+    list.innerHTML = '<div style="color:var(--text2);font-size:13px;text-align:center;padding:12px">該当する予定はありませんでした</div>';
+    document.getElementById('offleave-confirm-btn').disabled = true;
+  } else {
+    list.innerHTML = offLeaveCandidates.map((ev,i) => {
+      const d = new Date(ev.start);
+      const dateLabel = `${d.getUTCMonth()+1}/${d.getUTCDate()}`;
+      const badge = /leave/i.test(ev.summary) ? 'LEAVE' : 'OFF';
+      return `<div class="offleave-item">
+        <input type="checkbox" id="ol_${i}" checked>
+        <span class="offleave-date">${dateLabel}</span>
+        <span class="offleave-title">${ev.summary}</span>
+        <span class="offleave-badge">${badge}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('offleave-confirm-btn').disabled = false;
+  }
+  panel.style.display = 'block';
+  panel.classList.add('show');
+  panel.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function closeOffLeavePanel(){
+  document.getElementById('offleave-panel').style.display = 'none';
+  offLeaveCandidates = [];
+}
+
+async function confirmOffLeaveMigration(){
+  const selected = offLeaveCandidates.filter((_,i) => document.getElementById(`ol_${i}`)?.checked);
+  if(selected.length === 0){ showToast('選択された予定がありません'); return; }
+
+  const btn = document.getElementById('offleave-confirm-btn');
+  btn.disabled = true; btn.textContent = '移動中...';
+
+  let success = 0, fail = 0;
+  for(const ev of selected){
+    try {
+      // 1休日カレンダーに新規作成
+      const resource = {
+        summary: ev.summary,
+        description: ev.description,
+        location: ev.location
+      };
+      if(ev.isAllDay){
+        resource.start = { date: ev.start.slice(0,10) };
+        resource.end   = { date: ev.end.slice(0,10) };
+      } else {
+        resource.start = { dateTime: ev.start };
+        resource.end   = { dateTime: ev.end };
+      }
+      await gapi.client.calendar.events.insert({ calendarId: OFF_LEAVE_CAL_ID, resource });
+      // 元のイベントを削除
+      await gapi.client.calendar.events.delete({ calendarId: ev.sourceCalId, eventId: ev.id });
+      success++;
+    } catch(e){
+      console.error(e);
+      fail++;
+    }
+  }
+
+  btn.disabled = false; btn.textContent = 'この内容で移動する';
+  closeOffLeavePanel();
+  showToast(`${success}件を「1休日」へ移動しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
+}
 
 async function doFetch(){
   showToast('カレンダーを取得中...');
