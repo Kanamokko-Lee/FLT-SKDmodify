@@ -176,10 +176,7 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
     🏖 OFF・leave予定を「1休日」へ移動
   </button>
   <button class="sync-btn" id="fixallday-btn" onclick="startFixAllDay()" style="margin-top:8px;background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,0.4)">
-    🛠 「1休日」内のOFF・leaveを終日に修正
-  </button>
-  <button class="sync-btn" id="fixstandby-btn" onclick="startFixStandby()" style="margin-top:8px;background:rgba(74,158,255,0.10);color:var(--blue);border-color:rgba(74,158,255,0.4)">
-    🌙 「2フライト」内のSTANDBY(FO R)を終日に修正
+    🛠 「1休日」「2フライト」内のOFF・leave・STBY(FO R)を終日に修正
   </button>
 </div>
 
@@ -450,7 +447,6 @@ function initGis(){
       else if(pendingAction === 'register') await doRegisterAll();
       else if(pendingAction === 'offleave') await doOffLeaveSearch();
       else if(pendingAction === 'fixallday') await doFixAllDay();
-      else if(pendingAction === 'fixstandby') await doFixStandby();
       pendingAction = null;
     }
   });
@@ -494,7 +490,6 @@ async function withAuth(action){
     else if(action === 'register') await doRegisterAll();
     else if(action === 'offleave') await doOffLeaveSearch();
     else if(action === 'fixallday') await doFixAllDay();
-    else if(action === 'fixstandby') await doFixStandby();
     return;
   }
 
@@ -612,122 +607,83 @@ function toAllDayRange(startStr, endStr, wasAllDay){
   return { startDate, endDate };
 }
 
-/* ══ 2フライト内のSTANDBY(FO R)を終日修正 ══ */
-function startFixStandby(){ withAuth('fixstandby'); }
-
-async function doFixStandby(){
-  showToast('「2フライト」内のSTANDBY(FO R)予定を確認中...');
-  try {
-    let calId = localStorage.getItem('cfg_src_cal') || '2フライト';
-    if(!calId.includes('@') && calId !== 'primary'){
-      const res = await gapi.client.calendar.calendarList.list();
-      const found = (res.result.items || []).find(c => c.summary === calId);
-      if(found) calId = found.id;
-      else { showToast(`カレンダー「${calId}」が見つかりません`); return; }
-    }
-
-    const timeMin = rangeFrom ? rangeFrom.toISOString() : new Date(Date.now()-2*24*3600*1000).toISOString();
-    const timeMax = rangeTo   ? rangeTo.toISOString()   : new Date(Date.now()+90*24*3600*1000).toISOString();
-
-    const res = await gapi.client.calendar.events.list({
-      calendarId: calId, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 250
-    });
-
-    const items = (res.result.items || []).filter(item => {
-      const isTimed = !!item.start.dateTime;
-      const isStandby = /standby/i.test(item.summary || '');
-      const hasFOR = /FO\s*R\b/i.test(item.description || '');
-      return isTimed && isStandby && hasFOR;
-    });
-
-    if(items.length === 0){
-      showToast('終日に修正が必要なSTANDBY予定はありませんでした');
-      return;
-    }
-
-    let success = 0, fail = 0;
-    for(const item of items){
-      try {
-        // UTC開始時刻にJSTオフセット(+9h)を加えた日付を終日の開始日とする
-        const startUTC = new Date(item.start.dateTime);
-        const jstStart = new Date(startUTC.getTime() + 9*3600000);
-        const startDate = ymd(jstStart);
-        const next = new Date(jstStart); next.setUTCDate(next.getUTCDate()+1);
-        const endDate = ymd(next); // 終日のend.dateは排他的
-
-        const resource = {
-          summary: item.summary,
-          description: item.description || '',
-          location: item.location || '',
-          start: { date: startDate },
-          end: { date: endDate }
-        };
-        await gapi.client.request({
-          path: `/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${item.id}`,
-          method: 'PUT',
-          body: resource
-        });
-        success++;
-      } catch(e){
-        console.error('Fix error for', item.id, e.result?.error || e);
-        fail++;
-      }
-    }
-    showToast(`${success}件のSTANDBYを終日に修正しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
-  } catch(e){
-    const msg = e.result?.error?.message || e.message || JSON.stringify(e);
-    showToast('修正失敗: ' + msg);
-    console.error(e);
-  }
-}
-
-
+/* ══ 「1休日」「2フライト」内のOFF・leave・STANDBY(FO R)を終日修正 ══ */
 function startFixAllDay(){ withAuth('fixallday'); }
 
 async function doFixAllDay(){
-  showToast('「1休日」内のOFF・leave予定を確認中...');
+  showToast('OFF・leave・STANDBY(FO R)予定を確認中...');
+  let success = 0, fail = 0;
+
   try {
     const timeMin = rangeFrom ? rangeFrom.toISOString() : new Date(Date.now()-2*24*3600*1000).toISOString();
     const timeMax = rangeTo   ? rangeTo.toISOString()   : new Date(Date.now()+90*24*3600*1000).toISOString();
 
-    const res = await gapi.client.calendar.events.list({
+    /* ── 1) 「1休日」内のOFF・leave ── */
+    const res1 = await gapi.client.calendar.events.list({
       calendarId: OFF_LEAVE_CAL_ID, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 250
     });
-
-    const items = (res.result.items || []).filter(item => {
-      const isTimed = !!item.start.dateTime; // dateTime形式＝終日ではない
+    const offLeaveItems = (res1.result.items || []).filter(item => {
+      const isTimed = !!item.start.dateTime;
       return isTimed && /off|leave/i.test(item.summary || '');
     });
-
-    if(items.length === 0){
-      showToast('終日に修正が必要な予定はありませんでした');
-      return;
-    }
-
-    let success = 0, fail = 0;
-    for(const item of items){
+    for(const item of offLeaveItems){
       try {
         const { startDate, endDate } = toAllDayRange(item.start.dateTime, item.end.dateTime, false);
-        // patchではdateTime→date切り替えが400エラーになるため、フルリソースをupdateで送る
         const resource = {
-          summary: item.summary,
-          description: item.description || '',
-          location: item.location || '',
-          start: { date: startDate },
-          end: { date: endDate }
+          summary: item.summary, description: item.description || '', location: item.location || '',
+          start: { date: startDate }, end: { date: endDate }
         };
         await gapi.client.request({
           path: `/calendar/v3/calendars/${encodeURIComponent(OFF_LEAVE_CAL_ID)}/events/${item.id}`,
-          method: 'PUT',
-          body: resource
+          method: 'PUT', body: resource
         });
         success++;
-      } catch(e){
-        console.error('Fix error for', item.id, e.result?.error || e);
-        fail++;
+      } catch(e){ console.error('Fix error (1休日)', item.id, e.result?.error || e); fail++; }
+    }
+
+    /* ── 2) 「2フライト」内のSTANDBY(FO R) ── */
+    let calId = localStorage.getItem('cfg_src_cal') || '2フライト';
+    if(!calId.includes('@') && calId !== 'primary'){
+      const cl = await gapi.client.calendar.calendarList.list();
+      const found = (cl.result.items || []).find(c => c.summary === calId);
+      if(found) calId = found.id;
+      else calId = null;
+    }
+    if(calId){
+      const res2 = await gapi.client.calendar.events.list({
+        calendarId: calId, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 250
+      });
+      const standbyItems = (res2.result.items || []).filter(item => {
+        const isTimed = !!item.start.dateTime;
+        const isStandby = /standby/i.test(item.summary || '');
+        const hasFOR = /FO\s*R\b/i.test(item.description || '');
+        return isTimed && isStandby && hasFOR;
+      });
+      for(const item of standbyItems){
+        try {
+          const startUTC = new Date(item.start.dateTime);
+          const jstStart = new Date(startUTC.getTime() + 9*3600000);
+          const startDate = ymd(jstStart);
+          const next = new Date(jstStart); next.setUTCDate(next.getUTCDate()+1);
+          const endDate = ymd(next);
+          const resource = {
+            summary: item.summary, description: item.description || '', location: item.location || '',
+            start: { date: startDate }, end: { date: endDate }
+          };
+          await gapi.client.request({
+            path: `/calendar/v3/calendars/${encodeURIComponent(calId)}/events/${item.id}`,
+            method: 'PUT', body: resource
+          });
+          success++;
+        } catch(e){ console.error('Fix error (2フライト)', item.id, e.result?.error || e); fail++; }
       }
     }
-    showToast(`${success}件を終日に修正しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
+
+    if(success === 0 && fail === 0){
+      showToast('終日に修正が必要な予定はありませんでした');
+    } else {
+      showToast(`${success}件を終日に修正しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
+    }
   } catch(e){
     const msg = e.result?.error?.message || e.message || JSON.stringify(e);
     showToast('修正失敗: ' + msg);
