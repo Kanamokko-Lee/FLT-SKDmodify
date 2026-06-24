@@ -178,6 +178,19 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
   <button class="sync-btn" id="fixallday-btn" onclick="startFixAllDay()" style="margin-top:8px;background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,0.4)">
     🛠 「1休日」「2フライト」内のOFF・leave・STBY(FO R)を終日に修正
   </button>
+  <button class="sync-btn" id="mergeholiday-btn" onclick="startMergeHoliday()" style="margin-top:8px;background:rgba(167,139,250,0.10);color:#a78bfa;border-color:rgba(167,139,250,0.4)">
+    🔗 「1休日」内の連続したOFF・leaveを統合
+  </button>
+</div>
+
+<!-- 連続OFF/leave統合 結果 -->
+<div id="merge-panel" class="config-panel" style="display:none">
+  <div class="config-title" style="color:#a78bfa">🔗 統合対象一覧</div>
+  <div id="merge-list"></div>
+  <div class="cal-actions" style="margin-top:12px">
+    <button class="cal-btn cal-btn-cancel" onclick="closeMergePanel()">キャンセル</button>
+    <button class="cal-btn cal-btn-ok" id="merge-confirm-btn" onclick="confirmMergeHoliday()">この内容で統合する</button>
+  </div>
 </div>
 
 <!-- OFF/leave 移動結果 -->
@@ -447,6 +460,7 @@ function initGis(){
       else if(pendingAction === 'register') await doRegisterAll();
       else if(pendingAction === 'offleave') await doOffLeaveSearch();
       else if(pendingAction === 'fixallday') await doFixAllDay();
+      else if(pendingAction === 'mergeholiday') await doMergeHolidaySearch();
       pendingAction = null;
     }
   });
@@ -490,6 +504,7 @@ async function withAuth(action){
     else if(action === 'register') await doRegisterAll();
     else if(action === 'offleave') await doOffLeaveSearch();
     else if(action === 'fixallday') await doFixAllDay();
+    else if(action === 'mergeholiday') await doMergeHolidaySearch();
     return;
   }
 
@@ -593,6 +608,138 @@ function groupConsecutiveOffLeave(items){
       dayCount: group.length
     };
   });
+}
+
+/* ══ 「1休日」内の連続したOFF・leave統合 ══ */
+function startMergeHoliday(){ withAuth('mergeholiday'); }
+
+let mergeCandidates = [];
+
+async function doMergeHolidaySearch(){
+  showToast('「1休日」内の連続予定を確認中...');
+  try {
+    const timeMin = rangeFrom ? rangeFrom.toISOString() : new Date(Date.now()-2*24*3600*1000).toISOString();
+    const timeMax = rangeTo   ? rangeTo.toISOString()   : new Date(Date.now()+90*24*3600*1000).toISOString();
+
+    const res = await gapi.client.calendar.events.list({
+      calendarId: OFF_LEAVE_CAL_ID, timeMin, timeMax, singleEvents: true, orderBy: 'startTime', maxResults: 250
+    });
+
+    // 終日(date形式)のOFF/leave/HH系の予定のみ対象
+    const items = (res.result.items || [])
+      .filter(item => !item.start.dateTime && /off|leave|^hh$|vac/i.test(item.summary || ''))
+      .map(item => ({
+        id: item.id,
+        summary: item.summary,
+        start: item.start.date,
+        end: item.end.date, // 排他的
+        description: item.description || '',
+        location: item.location || ''
+      }))
+      .sort((a,b) => new Date(a.start) - new Date(b.start));
+
+    // 開始日が前の終了日(排他的)と一致 → 連続とみなしてグループ化
+    const groups = [];
+    let current = items.length ? [items[0]] : [];
+    for(let i=1; i<items.length; i++){
+      const prevEnd = current[current.length-1].end; // YYYY-MM-DD（排他的、次の開始日と同じはず）
+      if(items[i].start === prevEnd){
+        current.push(items[i]);
+      } else {
+        groups.push(current);
+        current = [items[i]];
+      }
+    }
+    if(current.length) groups.push(current);
+
+    // 2件以上のグループのみ統合対象として表示
+    mergeCandidates = groups.filter(g => g.length > 1).map(g => {
+      const summaries = [...new Set(g.map(x => x.summary))];
+      return {
+        ids: g.map(x => x.id),
+        summary: summaries.join(' / '),
+        start: g[0].start,
+        end: g[g.length-1].end, // 排他的（最終日の翌日）
+        description: g.map(x => x.description).filter(Boolean).join('\n---\n'),
+        location: g[0].location,
+        dayCount: g.length
+      };
+    });
+
+    renderMergePanel();
+  } catch(e){
+    const msg = e.result?.error?.message || e.message || JSON.stringify(e);
+    showToast('検索失敗: ' + msg);
+    console.error(e);
+  }
+}
+
+function renderMergePanel(){
+  const panel = document.getElementById('merge-panel');
+  const list  = document.getElementById('merge-list');
+  if(mergeCandidates.length === 0){
+    list.innerHTML = '<div style="color:var(--text2);font-size:13px;text-align:center;padding:12px">統合対象の連続予定はありませんでした</div>';
+    document.getElementById('merge-confirm-btn').disabled = true;
+  } else {
+    list.innerHTML = mergeCandidates.map((g,i) => {
+      const s = new Date(g.start);
+      const e = new Date(g.end); e.setUTCDate(e.getUTCDate()-1); // 表示用に最終日を戻す
+      const sFmt = `${s.getUTCMonth()+1}/${s.getUTCDate()}`;
+      const eFmt = `${e.getUTCMonth()+1}/${e.getUTCDate()}`;
+      return `<div class="offleave-item">
+        <input type="checkbox" id="mg_${i}" checked>
+        <span class="offleave-date">${sFmt}〜${eFmt}</span>
+        <span class="offleave-title">${g.summary}</span>
+        <span class="offleave-badge" style="background:rgba(167,139,250,0.15);color:#a78bfa">${g.dayCount}連続</span>
+      </div>`;
+    }).join('');
+    document.getElementById('merge-confirm-btn').disabled = false;
+  }
+  panel.style.display = 'block';
+  panel.classList.add('show');
+  panel.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+function closeMergePanel(){
+  document.getElementById('merge-panel').style.display = 'none';
+  mergeCandidates = [];
+}
+
+async function confirmMergeHoliday(){
+  const selected = mergeCandidates.filter((_,i) => document.getElementById(`mg_${i}`)?.checked);
+  if(selected.length === 0){ showToast('選択された予定がありません'); return; }
+
+  const btn = document.getElementById('merge-confirm-btn');
+  btn.disabled = true; btn.textContent = '統合中...';
+
+  let success = 0, fail = 0, deletedTotal = 0;
+  for(const g of selected){
+    try {
+      const resource = {
+        summary: g.summary,
+        description: g.description,
+        location: g.location,
+        start: { date: g.start },
+        end: { date: g.end }
+      };
+      await gapi.client.calendar.events.insert({ calendarId: OFF_LEAVE_CAL_ID, resource });
+
+      for(const id of g.ids){
+        try {
+          await gapi.client.calendar.events.delete({ calendarId: OFF_LEAVE_CAL_ID, eventId: id });
+          deletedTotal++;
+        } catch(de){ console.error('delete error', id, de); }
+      }
+      success++;
+    } catch(e){
+      console.error(e);
+      fail++;
+    }
+  }
+
+  btn.disabled = false; btn.textContent = 'この内容で統合する';
+  closeMergePanel();
+  showToast(`${success}件のグループ（元${deletedTotal}件）を統合しました${fail>0?`（失敗:${fail}件）`:''} ✓`);
 }
 
 function renderOffLeavePanel(){
