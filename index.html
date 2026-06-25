@@ -7,7 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="theme-color" content="#0a0e1a">
-<title>追検アラート</title>
+<title>SKD編集</title>
 <style>
 :root {
   --bg:#0a0e1a; --bg2:#111827; --bg3:#1a2235;
@@ -135,7 +135,7 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
   <div class="header-inner">
     <div class="header-icon">✈</div>
     <div class="header-text">
-      <div class="header-title">追検アラート</div>
+      <div class="header-title">SKD編集</div>
       <div class="header-sub" id="auth-status">設定してください</div>
     </div>
     <button class="header-btn" onclick="toggleConfig()">⚙ 設定</button>
@@ -171,16 +171,18 @@ main{padding:12px 16px 100px;max-width:640px;margin:0 auto}
       <button class="date-reset-btn" onclick="event.stopPropagation();resetDateRange()">リセット</button>
     </div>
   </div>
-  <button class="sync-btn" onclick="startSync()">🔄 Googleカレンダーからフライト情報を自動取得</button>
+  <button class="sync-btn" onclick="startSync()">🔄 18-8時間前・P/U時刻作成</button>
   <button class="sync-btn" id="offleave-btn" onclick="startOffLeaveMigration()" style="margin-top:8px;background:var(--green-dim);color:var(--green);border-color:rgba(52,199,138,0.4)">
     🏖 OFF・leave予定を「1休日」へ移動
   </button>
-  <button class="sync-btn" id="fixallday-btn" onclick="startFixAllDay()" style="margin-top:8px;background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,0.4)">
-    🛠 「1休日」「2フライト」内のOFF・leave・STBY(FO R)を終日に修正
-  </button>
-  <button class="sync-btn" id="mergeholiday-btn" onclick="startMergeHoliday()" style="margin-top:8px;background:rgba(167,139,250,0.10);color:#a78bfa;border-color:rgba(167,139,250,0.4)">
-    🔗 「1休日」内の連続したOFF・leaveを統合
-  </button>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="sync-btn" id="fixallday-btn" onclick="startFixAllDay()" style="flex:1;margin-top:0;background:var(--amber-dim);color:var(--amber);border-color:rgba(245,166,35,0.4);font-size:13px;padding:11px 8px">
+      🛠 休日・STBYを終日に修正
+    </button>
+    <button class="sync-btn" id="mergeholiday-btn" onclick="startMergeHoliday()" style="flex:1;margin-top:0;background:rgba(167,139,250,0.10);color:#a78bfa;border-color:rgba(167,139,250,0.4);font-size:13px;padding:11px 8px">
+      🔗 連休を結合
+    </button>
+  </div>
 </div>
 
 <!-- 連続OFF/leave統合 結果 -->
