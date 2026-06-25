@@ -1,7 +1,7 @@
 {
-  "name": "追検アラート",
-  "short_name": "追検",
-  "description": "フライトステイ後の追検時間帯を管理するPWAアプリ",
+  "name": "SKD編集",
+  "short_name": "SKD編集",
+  "description": "フライトスケジュール・追検・移動・休日を管理するPWAアプリ",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0a0e1a",
